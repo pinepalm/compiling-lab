@@ -1,7 +1,7 @@
-[jobs.test-submit]
+[jobs.lexer]
 
 image = { source = "dockerfile", path = "." }
 
 run = [
-  "dotnet TestSubmit.dll $input",
+  "dotnet SysYLexer.dll $input",
 ]
