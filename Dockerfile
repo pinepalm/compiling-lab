@@ -1,6 +1,5 @@
 FROM mcr.microsoft.com/dotnet/sdk:5.0
-COPY ./* /app/
-RUN ls -a
+COPY ./ /app/
 WORKDIR /app/TestSubmit/
 RUN ls -a
 RUN dotnet build --configuration Release
