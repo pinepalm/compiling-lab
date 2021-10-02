@@ -3,5 +3,5 @@
 image = { source = "dockerfile", path = "." }
 
 run = [
-  "dotnet TestSubmit.dll",
+  "dotnet TestSubmit.dll $input",
 ]

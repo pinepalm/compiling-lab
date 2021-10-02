@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Linq;
 
 namespace TestSubmit
@@ -7,13 +8,13 @@ namespace TestSubmit
     {
         static void Main(string[] args)
         {
-            var numbers = Enumerable.Empty<int>();
+            using var input = new StreamReader(args[0]);
 
+            var numbers = Enumerable.Empty<int>();
             while (numbers.Count() < 2)
             {
-                numbers = numbers.Concat(Console.ReadLine().Split(' ', StringSplitOptions.RemoveEmptyEntries).Select((str) => int.Parse(str)));
+                numbers = numbers.Concat(input.ReadLine().Split(' ', StringSplitOptions.RemoveEmptyEntries).Select((str) => int.Parse(str)));
             }
-
             Console.WriteLine(numbers.ElementAt(0) + numbers.ElementAt(1));
         }
     }
