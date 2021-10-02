@@ -1,4 +1,4 @@
-namespace SysYLexer
+namespace BUAA.CodeAnalysis.SysY
 {
     public static class CharExtensions
     {

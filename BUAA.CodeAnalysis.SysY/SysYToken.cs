@@ -1,8 +1,8 @@
-namespace SysYLexer
+namespace BUAA.CodeAnalysis.SysY
 {
-    public class Token
+    public class SysYToken
     {
-        public TokenType Type { get; set; }
+        public SysYTokenType Type { get; set; }
 
         public string Text { get; set; }
 
@@ -13,8 +13,8 @@ namespace SysYLexer
 
             return type switch
             {
-                TokenType.Ident => $"{type}({value})",
-                TokenType.Number => $"{type}({value})",
+                SysYTokenType.Ident => $"{type}({value})",
+                SysYTokenType.Number => $"{type}({value})",
                 _ => $"{type}"
             };
         }

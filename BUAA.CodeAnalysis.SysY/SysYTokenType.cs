@@ -1,6 +1,6 @@
-namespace SysYLexer
+namespace BUAA.CodeAnalysis.SysY
 {
-    public enum TokenType
+    public enum SysYTokenType
     {
         Ident,
         Number,

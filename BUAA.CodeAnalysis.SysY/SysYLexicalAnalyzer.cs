@@ -1,47 +1,30 @@
-﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using System.Threading.Tasks;
 
-namespace SysYLexer
+namespace BUAA.CodeAnalysis.SysY
 {
-    class Program
+    public partial class SysYLexicalAnalyzer
     {
-        private static Dictionary<string, TokenType> _keywords = new()
-        {
-            { "if", TokenType.If },
-            { "else", TokenType.Else },
-            { "while", TokenType.While },
-            { "break", TokenType.Break },
-            { "continue", TokenType.Continue },
-            { "return", TokenType.Return }
-        };
+        private readonly string _inputFile;
 
-        private static Dictionary<string, TokenType> _delimiters = new()
+        public SysYLexicalAnalyzer(string inputFile)
         {
-            { "=", TokenType.Assign },
-            { ";", TokenType.Semicolon },
-            { "(", TokenType.LPar },
-            { ")", TokenType.RPar },
-            { "{", TokenType.LBrace },
-            { "}", TokenType.RBrace },
-            { "+", TokenType.Plus },
-            { "*", TokenType.Mult },
-            { "/", TokenType.Div },
-            { "<", TokenType.Lt },
-            { ">", TokenType.Gt },
-            { "==", TokenType.Eq }
-        };
+            _inputFile = inputFile;
+        }
 
-        private static List<Token> ReadTokens(StreamReader input)
+        public async Task<List<SysYToken>> AnalyseAsync()
         {
-            var tokens = new List<Token>();
+            using var input = new StreamReader(_inputFile);
+
+            var tokens = new List<SysYToken>();
             var tokenBuilder = new StringBuilder();
-            var tokenType = default(TokenType);
+            var tokenType = default(SysYTokenType);
             var tokenText = default(string);
             var line = default(string);
 
-            while ((line = input.ReadLine()) is not null)
+            while ((line = await input.ReadLineAsync()) is not null)
             {
                 int charIndex = 0;
 
@@ -76,11 +59,11 @@ namespace SysYLexer
                         tokenText = tokenBuilder.ToString();
                         if (_keywords.TryGetValue(tokenText, out tokenType))
                         {
-                            tokens.Add(new Token() { Type = tokenType });
+                            tokens.Add(new SysYToken() { Type = tokenType });
                         }
                         else
                         {
-                            tokens.Add(new Token() { Type = TokenType.Ident, Text = tokenText });
+                            tokens.Add(new SysYToken() { Type = SysYTokenType.Ident, Text = tokenText });
                         }
 
                         continue;
@@ -105,7 +88,7 @@ namespace SysYLexer
                         }
 
                         tokenText = tokenBuilder.ToString();
-                        tokens.Add(new Token() { Type = TokenType.Number, Text = tokenText });
+                        tokens.Add(new SysYToken() { Type = SysYTokenType.Number, Text = tokenText });
 
                         continue;
                     }
@@ -129,30 +112,46 @@ namespace SysYLexer
                     tokenText = tokenBuilder.ToString();
                     if (_delimiters.TryGetValue(tokenText, out tokenType))
                     {
-                        tokens.Add(new Token() { Type = tokenType });
+                        tokens.Add(new SysYToken() { Type = tokenType });
 
                         continue;
                     }
 
-                    tokens.Add(new Token() { Type = TokenType.Err });
+                    tokens.Add(new SysYToken() { Type = SysYTokenType.Err });
                     return tokens;
                 }
             }
 
             return tokens;
         }
+    }
 
-        private static void WriteTokens(List<Token> tokens)
+    public partial class SysYLexicalAnalyzer
+    {
+        private static Dictionary<string, SysYTokenType> _keywords = new()
         {
-            tokens?.ForEach((token) => Console.WriteLine(token));
-        }
+            { "if", SysYTokenType.If },
+            { "else", SysYTokenType.Else },
+            { "while", SysYTokenType.While },
+            { "break", SysYTokenType.Break },
+            { "continue", SysYTokenType.Continue },
+            { "return", SysYTokenType.Return }
+        };
 
-        static void Main(string[] args)
+        private static Dictionary<string, SysYTokenType> _delimiters = new()
         {
-            using var input = new StreamReader(args[0]);
-
-            var tokens = ReadTokens(input);
-            WriteTokens(tokens);
-        }
+            { "=", SysYTokenType.Assign },
+            { ";", SysYTokenType.Semicolon },
+            { "(", SysYTokenType.LPar },
+            { ")", SysYTokenType.RPar },
+            { "{", SysYTokenType.LBrace },
+            { "}", SysYTokenType.RBrace },
+            { "+", SysYTokenType.Plus },
+            { "*", SysYTokenType.Mult },
+            { "/", SysYTokenType.Div },
+            { "<", SysYTokenType.Lt },
+            { ">", SysYTokenType.Gt },
+            { "==", SysYTokenType.Eq }
+        };
     }
 }
