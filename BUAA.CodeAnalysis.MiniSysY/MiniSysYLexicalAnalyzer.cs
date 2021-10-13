@@ -3,24 +3,24 @@ using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace BUAA.CodeAnalysis.SysY
+namespace BUAA.CodeAnalysis.MiniSysY
 {
-    public partial class SysYLexicalAnalyzer
+    public partial class MiniSysYLexicalAnalyzer
     {
         private readonly string _inputFile;
 
-        public SysYLexicalAnalyzer(string inputFile)
+        public MiniSysYLexicalAnalyzer(string inputFile)
         {
             _inputFile = inputFile;
         }
 
-        public async Task<List<SysYToken>> AnalyseAsync()
+        public async Task<List<MiniSysYToken>> AnalyseAsync()
         {
             using var input = new StreamReader(_inputFile);
 
-            var tokens = new List<SysYToken>();
+            var tokens = new List<MiniSysYToken>();
             var tokenBuilder = new StringBuilder();
-            var tokenType = default(SysYTokenType);
+            var tokenType = default(MiniSysYTokenType);
             var tokenText = default(string);
             var line = default(string);
 
@@ -59,11 +59,11 @@ namespace BUAA.CodeAnalysis.SysY
                         tokenText = tokenBuilder.ToString();
                         if (_keywords.TryGetValue(tokenText, out tokenType))
                         {
-                            tokens.Add(new SysYToken() { Type = tokenType });
+                            tokens.Add(new MiniSysYToken() { Type = tokenType });
                         }
                         else
                         {
-                            tokens.Add(new SysYToken() { Type = SysYTokenType.Ident, Text = tokenText });
+                            tokens.Add(new MiniSysYToken() { Type = MiniSysYTokenType.Ident, Text = tokenText });
                         }
 
                         continue;
@@ -88,7 +88,7 @@ namespace BUAA.CodeAnalysis.SysY
                         }
 
                         tokenText = tokenBuilder.ToString();
-                        tokens.Add(new SysYToken() { Type = SysYTokenType.Number, Text = tokenText });
+                        tokens.Add(new MiniSysYToken() { Type = MiniSysYTokenType.Number, Text = tokenText });
 
                         continue;
                     }
@@ -112,12 +112,12 @@ namespace BUAA.CodeAnalysis.SysY
                     tokenText = tokenBuilder.ToString();
                     if (_delimiters.TryGetValue(tokenText, out tokenType))
                     {
-                        tokens.Add(new SysYToken() { Type = tokenType });
+                        tokens.Add(new MiniSysYToken() { Type = tokenType });
 
                         continue;
                     }
 
-                    tokens.Add(new SysYToken() { Type = SysYTokenType.Err });
+                    tokens.Add(new MiniSysYToken() { Type = MiniSysYTokenType.Err });
                     return tokens;
                 }
             }
@@ -126,32 +126,32 @@ namespace BUAA.CodeAnalysis.SysY
         }
     }
 
-    public partial class SysYLexicalAnalyzer
+    public partial class MiniSysYLexicalAnalyzer
     {
-        private static Dictionary<string, SysYTokenType> _keywords = new()
+        private static Dictionary<string, MiniSysYTokenType> _keywords = new()
         {
-            { "if", SysYTokenType.If },
-            { "else", SysYTokenType.Else },
-            { "while", SysYTokenType.While },
-            { "break", SysYTokenType.Break },
-            { "continue", SysYTokenType.Continue },
-            { "return", SysYTokenType.Return }
+            { "if", MiniSysYTokenType.If },
+            { "else", MiniSysYTokenType.Else },
+            { "while", MiniSysYTokenType.While },
+            { "break", MiniSysYTokenType.Break },
+            { "continue", MiniSysYTokenType.Continue },
+            { "return", MiniSysYTokenType.Return }
         };
 
-        private static Dictionary<string, SysYTokenType> _delimiters = new()
+        private static Dictionary<string, MiniSysYTokenType> _delimiters = new()
         {
-            { "=", SysYTokenType.Assign },
-            { ";", SysYTokenType.Semicolon },
-            { "(", SysYTokenType.LPar },
-            { ")", SysYTokenType.RPar },
-            { "{", SysYTokenType.LBrace },
-            { "}", SysYTokenType.RBrace },
-            { "+", SysYTokenType.Plus },
-            { "*", SysYTokenType.Mult },
-            { "/", SysYTokenType.Div },
-            { "<", SysYTokenType.Lt },
-            { ">", SysYTokenType.Gt },
-            { "==", SysYTokenType.Eq }
+            { "=", MiniSysYTokenType.Assign },
+            { ";", MiniSysYTokenType.Semicolon },
+            { "(", MiniSysYTokenType.LPar },
+            { ")", MiniSysYTokenType.RPar },
+            { "{", MiniSysYTokenType.LBrace },
+            { "}", MiniSysYTokenType.RBrace },
+            { "+", MiniSysYTokenType.Plus },
+            { "*", MiniSysYTokenType.Mult },
+            { "/", MiniSysYTokenType.Div },
+            { "<", MiniSysYTokenType.Lt },
+            { ">", MiniSysYTokenType.Gt },
+            { "==", MiniSysYTokenType.Eq }
         };
     }
 }

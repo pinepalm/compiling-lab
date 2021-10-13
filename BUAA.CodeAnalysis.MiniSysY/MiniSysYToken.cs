@@ -1,8 +1,8 @@
-namespace BUAA.CodeAnalysis.SysY
+namespace BUAA.CodeAnalysis.MiniSysY
 {
-    public class SysYToken
+    public class MiniSysYToken
     {
-        public SysYTokenType Type { get; set; }
+        public MiniSysYTokenType Type { get; set; }
 
         public string Text { get; set; }
 
@@ -13,8 +13,8 @@ namespace BUAA.CodeAnalysis.SysY
 
             return type switch
             {
-                SysYTokenType.Ident => $"{type}({value})",
-                SysYTokenType.Number => $"{type}({value})",
+                MiniSysYTokenType.Ident => $"{type}({value})",
+                MiniSysYTokenType.Number => $"{type}({value})",
                 _ => $"{type}"
             };
         }

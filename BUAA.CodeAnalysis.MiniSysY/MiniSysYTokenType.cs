@@ -1,6 +1,6 @@
-namespace BUAA.CodeAnalysis.SysY
+namespace BUAA.CodeAnalysis.MiniSysY
 {
-    public enum SysYTokenType
+    public enum MiniSysYTokenType
     {
         Ident,
         Number,

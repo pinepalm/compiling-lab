@@ -1,4 +1,4 @@
-namespace BUAA.CodeAnalysis.SysY
+namespace BUAA.CodeAnalysis.MiniSysY
 {
     public static class CharExtensions
     {

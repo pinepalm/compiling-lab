@@ -3,5 +3,5 @@
 image = { source = "dockerfile", path = "." }
 
 run = [
-  "dotnet BUAA.CodeAnalysis.SysY.dll $input",
+  "dotnet BUAA.CodeAnalysis.MiniSysY.dll $input",
 ]
