@@ -17,50 +17,57 @@ namespace BUAA.CodeAnalysis.MiniSysY
 
         static void Main(string[] args)
         {
+            try
+            {
 
 #if DEBUG
-            var lexer = new Lexer(TestMiniSysYCodeText);
+                var lexer = new Lexer(TestMiniSysYCodeText);
 #else
-            using var input = new StreamReader(args[0]);
-            
-            var text = input.ReadToEnd();
-            var lexer = new Lexer(text);
+                using var input = new StreamReader(args[0]);
+                
+                var text = input.ReadToEnd();
+                var lexer = new Lexer(text);
 
-            input.Close();
+                input.Close();
 #endif
 
-            var tokens = lexer.Analyse(out var trivias);
+                var tokens = lexer.Analyse(out var trivias);
 
 #if DEBUG
-            Console.WriteLine("SyntaxTokens ->");
-            Console.WriteLine("------------------------------");
-            tokens?.ToList().ForEach((token) => Console.WriteLine($"{token.Text}: {token.Kind}"));
-            Console.WriteLine("******************************");
-            Console.WriteLine("SyntaxTrivias ->");
-            Console.WriteLine("------------------------------");
-            trivias?.ToList().ForEach((trivia) => Console.WriteLine($"{trivia.Kind}"));
-            Console.WriteLine("******************************");
+                Console.WriteLine("SyntaxTokens ->");
+                Console.WriteLine("------------------------------");
+                tokens?.ToList().ForEach((token) => Console.WriteLine($"{token.Text}: {token.Kind}"));
+                Console.WriteLine("******************************");
+                Console.WriteLine("SyntaxTrivias ->");
+                Console.WriteLine("------------------------------");
+                trivias?.ToList().ForEach((trivia) => Console.WriteLine($"{trivia.Kind}"));
+                Console.WriteLine("******************************");
 #endif
 
-            var parser = new SyntaxParser(tokens);
-            var tree = parser.Parse().AsSyntaxTree();
+                var parser = new SyntaxParser(tokens);
+                var tree = parser.Parse().AsSyntaxTree();
 
-            var builder = new LLVMIRBuilder(tree);
-            var llvmIR = builder.Realize();
+                var builder = new LLVMIRBuilder(tree);
+                var llvmIR = builder.Realize();
 
 #if DEBUG
-            Console.WriteLine("LLVM IR ->");
-            Console.WriteLine("------------------------------");
-            Console.WriteLine(llvmIR);
-            Console.WriteLine("******************************");
+                Console.WriteLine("LLVM IR ->");
+                Console.WriteLine("------------------------------");
+                Console.WriteLine(llvmIR);
+                Console.WriteLine("******************************");
 #else
-            using var output = new StreamWriter(args[1]);
+                using var output = new StreamWriter(args[1]);
 
-            output.Write(llvmIR);
-            output.Flush();
-            output.Close();
+                output.Write(llvmIR);
+                output.Flush();
+                output.Close();
 #endif
 
+            }
+            catch (Exception)
+            {
+                Environment.Exit(1);
+            }
         }
     }
 }
