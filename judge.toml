@@ -1,7 +1,7 @@
-[jobs.lexer]
+[jobs.lab1]
 
 image = { source = "dockerfile", path = "." }
 
 run = [
-  "dotnet BUAA.CodeAnalysis.MiniSysY.dll $input",
+  "dotnet BUAA.CodeAnalysis.MiniSysY.dll $input $ir",
 ]
