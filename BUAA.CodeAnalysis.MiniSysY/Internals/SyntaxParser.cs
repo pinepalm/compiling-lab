@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace BUAA.CodeAnalysis.MiniSysY.Internals
 {
@@ -203,42 +204,104 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
 
             bool ParseExpression(out ExpressionSyntax expression)
             {
-                if (ParseExpressionCore(out var leftExpression, null))
+                // if (ParseExpressionCore(out var leftExpression, null))
+                // {
+                //     var token = tokenListViewer.PeekToken();
+
+                //     if (_precedenceOfOperators.ContainsKey(token.Kind))
+                //     {
+                //         int position = tokenListViewer.Position;
+
+                //         tokenListViewer.AdvanceToken();
+
+                //         if (ParseExpression(out var rightExpression))
+                //         {
+                //             expression = new BinaryExpressionSyntax(_binaryExpressionKindOfOperators[token.Kind])
+                //             {
+                //                 Left = leftExpression,
+                //                 OperatorToken = token,
+                //                 Right = rightExpression
+                //             };
+
+                //             return true;
+                //         }
+                //         else
+                //         {
+                //             tokenListViewer.Reset(position);
+
+                //             expression = leftExpression;
+
+                //             return true;
+                //         }
+                //     }
+                //     else
+                //     {
+                //         expression = leftExpression;
+
+                //         return true;
+                //     }
+                // }
+
+                // expression = null;
+
+                // return false;
+
+                var samePrecedenceExpressionLinkedList = new LinkedList<ExpressionSyntax>();
+                var operatorLinkedList = new LinkedList<SyntaxToken>();
+                int position = tokenListViewer.Position;
+
+                while (ParseExpressionCore(out var samePrecedenceExpression))
                 {
+                    samePrecedenceExpressionLinkedList.AddLast(samePrecedenceExpression);
+
                     var token = tokenListViewer.PeekToken();
 
                     if (_precedenceOfOperators.ContainsKey(token.Kind))
                     {
-                        int position = tokenListViewer.Position;
+                        position = tokenListViewer.Position;
 
                         tokenListViewer.AdvanceToken();
 
-                        if (ParseExpression(out var rightExpression))
-                        {
-                            expression = new BinaryExpressionSyntax(_binaryExpressionKindOfOperators[token.Kind])
-                            {
-                                Left = leftExpression,
-                                OperatorToken = token,
-                                Right = rightExpression
-                            };
-
-                            return true;
-                        }
-                        else
-                        {
-                            tokenListViewer.Reset(position);
-
-                            expression = leftExpression;
-
-                            return true;
-                        }
+                        operatorLinkedList.AddLast(token);
                     }
                     else
                     {
-                        expression = leftExpression;
-
-                        return true;
+                        break;
                     }
+                }
+
+                if (samePrecedenceExpressionLinkedList.Any())
+                {
+                    if (samePrecedenceExpressionLinkedList.Count == operatorLinkedList.Count)
+                    {
+                        operatorLinkedList.RemoveLast();
+                        tokenListViewer.Reset(position);
+                    }
+
+                    while (operatorLinkedList.Any())
+                    {
+                        var leftExpression = samePrecedenceExpressionLinkedList.First();
+                        samePrecedenceExpressionLinkedList.RemoveFirst();
+
+                        var @operator = operatorLinkedList.First();
+                        operatorLinkedList.RemoveFirst();
+
+                        var rightExpression = samePrecedenceExpressionLinkedList.First();
+                        samePrecedenceExpressionLinkedList.RemoveFirst();
+
+                        var binaryExpression = new BinaryExpressionSyntax(_binaryExpressionKindOfOperators[@operator.Kind])
+                        {
+                            Left = leftExpression,
+                            OperatorToken = @operator,
+                            Right = rightExpression
+                        };
+
+                        samePrecedenceExpressionLinkedList.AddFirst(binaryExpression);
+                    }
+
+                    expression = samePrecedenceExpressionLinkedList.First();
+
+                    return true;
                 }
 
                 expression = null;
@@ -246,59 +309,133 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                 return false;
             }
 
-            bool ParseExpressionCore(out ExpressionSyntax expression, int? precedence)
+            bool ParseExpressionCore(out ExpressionSyntax expression)
             {
-                if (ParsePrefixUnaryOrLiteralOrParenthesizedExpression(out var leftExpression))
+                // if (ParsePrefixUnaryOrLiteralOrParenthesizedExpression(out var leftExpression))
+                // {
+                //     var token = tokenListViewer.PeekToken();
+
+                //     if (_precedenceOfOperators.TryGetValue(token.Kind, out var precedenceOfOperator))
+                //     {
+                //         if (precedence is null || precedence == precedenceOfOperator)
+                //         {
+                //             int position = tokenListViewer.Position;
+
+                //             tokenListViewer.AdvanceToken();
+
+                //             if (ParseExpressionCore(out var rightExpression, precedenceOfOperator))
+                //             {
+                //                 expression = new BinaryExpressionSyntax(_binaryExpressionKindOfOperators[token.Kind])
+                //                 {
+                //                     Left = leftExpression,
+                //                     OperatorToken = token,
+                //                     Right = rightExpression
+                //                 };
+
+                //                 return true;
+                //             }
+                //             else
+                //             {
+                //                 tokenListViewer.Reset(position);
+
+                //                 expression = leftExpression;
+
+                //                 return true;
+                //             }
+                //         }
+                //         else if (precedence > precedenceOfOperator)
+                //         {
+                //             expression = leftExpression;
+
+                //             return true;
+                //         }
+                //         else
+                //         {
+                //             expression = null;
+
+                //             return false;
+                //         }
+                //     }
+                //     else
+                //     {
+                //         expression = leftExpression;
+
+                //         return true;
+                //     }
+                // }
+
+                // expression = null;
+
+                // return false;
+
+                var unaryExpressionLinkedList = new LinkedList<ExpressionSyntax>();
+                var operatorLinkedList = new LinkedList<SyntaxToken>();
+                int position = tokenListViewer.Position;
+                int? precedence = null;
+
+                while (ParsePrefixUnaryOrLiteralOrParenthesizedExpression(out var unaryExpression))
                 {
+                    unaryExpressionLinkedList.AddLast(unaryExpression);
+
                     var token = tokenListViewer.PeekToken();
 
                     if (_precedenceOfOperators.TryGetValue(token.Kind, out var precedenceOfOperator))
                     {
                         if (precedence is null || precedence == precedenceOfOperator)
                         {
-                            int position = tokenListViewer.Position;
+                            position = tokenListViewer.Position;
 
                             tokenListViewer.AdvanceToken();
 
-                            if (ParseExpressionCore(out var rightExpression, precedenceOfOperator))
-                            {
-                                expression = new BinaryExpressionSyntax(_binaryExpressionKindOfOperators[token.Kind])
-                                {
-                                    Left = leftExpression,
-                                    OperatorToken = token,
-                                    Right = rightExpression
-                                };
+                            operatorLinkedList.AddLast(token);
 
-                                return true;
-                            }
-                            else
-                            {
-                                tokenListViewer.Reset(position);
-
-                                expression = leftExpression;
-
-                                return true;
-                            }
+                            precedence = precedenceOfOperator;
                         }
                         else if (precedence > precedenceOfOperator)
                         {
-                            expression = leftExpression;
-
-                            return true;
+                            break;
                         }
                         else
                         {
-                            expression = null;
+                            unaryExpressionLinkedList.RemoveLast();
+                            operatorLinkedList.RemoveLast();
+                            tokenListViewer.Reset(position);
 
-                            return false;
+                            break;
                         }
                     }
                     else
                     {
-                        expression = leftExpression;
-
-                        return true;
+                        break;
                     }
+                }
+
+                if (unaryExpressionLinkedList.Any())
+                {
+                    while (operatorLinkedList.Any())
+                    {
+                        var leftExpression = unaryExpressionLinkedList.First();
+                        unaryExpressionLinkedList.RemoveFirst();
+
+                        var @operator = operatorLinkedList.First();
+                        operatorLinkedList.RemoveFirst();
+
+                        var rightExpression = unaryExpressionLinkedList.First();
+                        unaryExpressionLinkedList.RemoveFirst();
+
+                        var binaryExpression = new BinaryExpressionSyntax(_binaryExpressionKindOfOperators[@operator.Kind])
+                        {
+                            Left = leftExpression,
+                            OperatorToken = @operator,
+                            Right = rightExpression
+                        };
+
+                        unaryExpressionLinkedList.AddFirst(binaryExpression);
+                    }
+
+                    expression = unaryExpressionLinkedList.First();
+
+                    return true;
                 }
 
                 expression = null;

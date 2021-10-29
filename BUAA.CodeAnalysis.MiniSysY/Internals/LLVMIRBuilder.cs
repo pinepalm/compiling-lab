@@ -95,7 +95,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                             {
                                 var returnStatement = statement as ReturnStatementSyntax;
 
-                                RealizeExpression(returnStatement.Expression, 1, out int endReg);
+                                RealizeExpression(returnStatement.Expression, 1, out int? endReg);
                                 builder.Append($"{_keywords[returnStatement.ReturnKeyword.Kind]} {_keywords[SyntaxKind.IntKeyword]} %{endReg}");
                                 builder.Append(_delimiters[returnStatement.SemicolonToken.Kind]);
                             }
@@ -107,7 +107,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                 }
             }
 
-            void RealizeExpression(ExpressionSyntax expression, int startReg, out int endReg)
+            void RealizeExpression(ExpressionSyntax expression, int startReg, out int? endReg)
             {
                 switch (expression.Kind)
                 {
@@ -116,7 +116,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                         {
                             var prefixUnaryExpression = expression as PrefixUnaryExpressionSyntax;
 
-                            RealizeExpression(prefixUnaryExpression.Operand, startReg, out int beforeEndReg);
+                            RealizeExpression(prefixUnaryExpression.Operand, startReg, out int? beforeEndReg);
                             builder.Append($"%{beforeEndReg + 1} = {_expressionOperators[expression.Kind]} {_keywords[SyntaxKind.IntKeyword]} 0, %{beforeEndReg}");
                             builder.AppendLine();
 
@@ -151,8 +151,8 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                         {
                             var binaryExpression = expression as BinaryExpressionSyntax;
 
-                            RealizeExpression(binaryExpression.Left, startReg, out int middleReg);
-                            RealizeExpression(binaryExpression.Right, middleReg + 1, out int beforeEndReg);
+                            RealizeExpression(binaryExpression.Left, startReg, out int? middleReg);
+                            RealizeExpression(binaryExpression.Right, (int)middleReg + 1, out int? beforeEndReg);
 
                             if (expression.Kind is SyntaxKind.ModuloExpression)
                             {
@@ -176,7 +176,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
 
                         break;
                     default:
-                        endReg = startReg;
+                        endReg = null;
 
                         break;
                 }

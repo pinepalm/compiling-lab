@@ -11,7 +11,7 @@ namespace BUAA.CodeAnalysis.MiniSysY
 #if DEBUG
         private const string TestMiniSysYCodeText =
 @"int main() { // mian
-    return /* 123 */ 4 * (1 / 5) - 4 + 1 ** 1;
+    return /* 123 */ 3 + 6 - 4 * 8 * 1 + 5 * 2;
 }";
 #endif
 
