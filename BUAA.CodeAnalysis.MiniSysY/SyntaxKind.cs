@@ -23,7 +23,19 @@ namespace BUAA.CodeAnalysis.MiniSysY
         ParameterList,
         ReturnStatement,
         MethodDeclaration,
-        // this is a temp kind
-        Expression
+        PlusToken,
+        MinusToken,
+        AsteriskToken,
+        SlashToken,
+        PercentToken,
+        UnaryPlusExpression,
+        UnaryMinusExpression,
+        AddExpression,
+        SubtractExpression,
+        MultiplyExpression,
+        DivideExpression,
+        ModuloExpression,
+        ParenthesizedExpression,
+        NumericLiteralExpression
     }
 }

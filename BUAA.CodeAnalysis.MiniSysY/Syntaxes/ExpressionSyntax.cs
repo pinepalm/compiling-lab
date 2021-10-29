@@ -1,13 +1,11 @@
 namespace BUAA.CodeAnalysis.MiniSysY
 {
-    public class ExpressionSyntax : SyntaxNode
+    public abstract class ExpressionSyntax : ExpressionOrPatternSyntax
     {
-        internal ExpressionSyntax()
-            : base(SyntaxKind.Expression)
+        internal ExpressionSyntax(SyntaxKind kind)
+            : base(kind)
         {
 
         }
-
-        public SyntaxToken NumericLiteralToken { get; init; }
     }
 }

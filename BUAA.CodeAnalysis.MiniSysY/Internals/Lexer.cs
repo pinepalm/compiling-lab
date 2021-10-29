@@ -42,7 +42,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                         {
                             var delimiter = c.ToString();
 
-                            if (_delimiters1.TryGetValue(delimiter, out var tokenKind))
+                            if (_delimiters.TryGetValue(delimiter, out var tokenKind))
                             {
                                 textViewer.AdvanceChar(delimiter.Length);
                                 tokens.Add(new SyntaxToken() { Kind = tokenKind, Text = delimiter });
@@ -65,6 +65,25 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                             else if (peekChar is '*')
                             {
                                 ScanMultiLineComment();
+                            }
+                            else
+                            {
+                                goto case '+';
+                            }
+                        }
+
+                        break;
+                    case '+':
+                    case '-':
+                    case '*':
+                    case '%':
+                        {
+                            var @operator = c.ToString();
+
+                            if (_operators.TryGetValue(@operator, out var tokenKind))
+                            {
+                                textViewer.AdvanceChar(@operator.Length);
+                                tokens.Add(new SyntaxToken() { Kind = tokenKind, Text = @operator });
                             }
                             else
                             {
@@ -270,13 +289,22 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
             { "return", SyntaxKind.ReturnKeyword }
         };
 
-        private static Dictionary<string, SyntaxKind> _delimiters1 = new()
+        private static Dictionary<string, SyntaxKind> _delimiters = new()
         {
             { "(", SyntaxKind.OpenParenToken },
             { ")", SyntaxKind.CloseParenToken },
             { "{", SyntaxKind.OpenBraceToken },
             { "}", SyntaxKind.CloseBraceToken },
             { ";", SyntaxKind.SemicolonToken }
+        };
+
+        private static Dictionary<string, SyntaxKind> _operators = new()
+        {
+            { "+", SyntaxKind.PlusToken },
+            { "-", SyntaxKind.MinusToken },
+            { "*", SyntaxKind.AsteriskToken },
+            { "/", SyntaxKind.SlashToken },
+            { "%", SyntaxKind.PercentToken }
         };
     }
 }
