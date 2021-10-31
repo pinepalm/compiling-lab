@@ -1,6 +1,8 @@
+using System.Collections.Generic;
+
 namespace BUAA.CodeAnalysis.MiniSysY
 {
-    public class ParameterListSyntax : SyntaxNode
+    public class ParameterListSyntax : BaseParameterListSyntax
     {
         internal ParameterListSyntax()
             : base(SyntaxKind.ParameterList)
@@ -9,6 +11,8 @@ namespace BUAA.CodeAnalysis.MiniSysY
         }
 
         public SyntaxToken OpenParenToken { get; init; }
+
+        public override IReadOnlyList<ParameterSyntax> Parameters { get; init; }
 
         public SyntaxToken CloseParenToken { get; init; }
     }

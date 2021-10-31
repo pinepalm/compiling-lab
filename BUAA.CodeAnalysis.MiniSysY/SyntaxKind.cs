@@ -36,6 +36,20 @@ namespace BUAA.CodeAnalysis.MiniSysY
         DivideExpression,
         ModuloExpression,
         ParenthesizedExpression,
-        NumericLiteralExpression
+        NumericLiteralExpression,
+        ConstKeyword,
+        SimpleAssignmentExpression,
+        LocalDeclarationStatement,
+        VariableDeclaration,
+        VariableDeclarator,
+        InvocationExpression,
+        IdentifierName,
+        ArgumentList,
+        Argument,
+        EqualsValueClause,
+        EqualsToken,
+        CommaToken,
+        ExpressionStatement,
+        EmptyStatement
     }
 }

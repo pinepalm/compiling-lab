@@ -39,6 +39,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                     case '{':
                     case '}':
                     case ';':
+                    case ',':
                         {
                             var delimiter = c.ToString();
 
@@ -68,11 +69,12 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                             }
                             else
                             {
-                                goto case '+';
+                                goto case '%';
                             }
                         }
 
                         break;
+                    case '=':
                     case '+':
                     case '-':
                     case '*':
@@ -283,28 +285,31 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
 
     internal partial class Lexer
     {
-        private static Dictionary<string, SyntaxKind> _keywords = new()
+        private static readonly Dictionary<string, SyntaxKind> _keywords = new()
         {
             { "int", SyntaxKind.IntKeyword },
-            { "return", SyntaxKind.ReturnKeyword }
+            { "return", SyntaxKind.ReturnKeyword },
+            { "const", SyntaxKind.ConstKeyword }
         };
 
-        private static Dictionary<string, SyntaxKind> _delimiters = new()
+        private static readonly Dictionary<string, SyntaxKind> _delimiters = new()
         {
             { "(", SyntaxKind.OpenParenToken },
             { ")", SyntaxKind.CloseParenToken },
             { "{", SyntaxKind.OpenBraceToken },
             { "}", SyntaxKind.CloseBraceToken },
-            { ";", SyntaxKind.SemicolonToken }
+            { ";", SyntaxKind.SemicolonToken },
+            { ",", SyntaxKind.CommaToken }
         };
 
-        private static Dictionary<string, SyntaxKind> _operators = new()
+        private static readonly Dictionary<string, SyntaxKind> _operators = new()
         {
             { "+", SyntaxKind.PlusToken },
             { "-", SyntaxKind.MinusToken },
             { "*", SyntaxKind.AsteriskToken },
             { "/", SyntaxKind.SlashToken },
-            { "%", SyntaxKind.PercentToken }
+            { "%", SyntaxKind.PercentToken },
+            { "=", SyntaxKind.EqualsToken }
         };
     }
 }

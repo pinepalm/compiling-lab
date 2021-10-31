@@ -10,8 +10,10 @@ namespace BUAA.CodeAnalysis.MiniSysY
 
 #if DEBUG
         private const string TestMiniSysYCodeText =
-@"int main() { // mian
-    return /* 123 */ 3 + 6 - 4 * 8 * 1 + 5 * 2;
+@"int main() {
+    int n = getint();
+    putint(n + 4);
+    return 0;
 }";
 #endif
 
@@ -45,7 +47,7 @@ namespace BUAA.CodeAnalysis.MiniSysY
 #endif
 
                 var parser = new SyntaxParser(tokens);
-                var tree = parser.Parse().AsSyntaxTree();
+                var tree = parser.Parse().WithRuntimeMethods().AsSyntaxTree();
 
                 var builder = new LLVMIRBuilder(tree);
                 var llvmIR = builder.Realize();
