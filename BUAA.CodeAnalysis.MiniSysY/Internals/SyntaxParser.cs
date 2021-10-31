@@ -123,11 +123,11 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                     {
                         tokenListViewer.AdvanceToken(2);
 
-                        parameterList = new ParameterListSyntax() 
-                        { 
-                            OpenParenToken = token, 
+                        parameterList = new ParameterListSyntax()
+                        {
+                            OpenParenToken = token,
                             Parameters = (new List<ParameterSyntax>()).AsReadOnly(),
-                            CloseParenToken = peekToken 
+                            CloseParenToken = peekToken
                         };
 
                         return true;
@@ -341,19 +341,6 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                 variableModifiers = modifiers.AsReadOnly();
 
                 return true;
-
-                bool ContainsModifierKind(IEnumerable<SyntaxToken> modifiers, SyntaxKind kind)
-                {
-                    foreach (var modifier in modifiers)
-                    {
-                        if (kind == modifier.Kind)
-                        {
-                            return true;
-                        }
-                    }
-
-                    return false;
-                }
             }
 
             bool ParseVariableDeclaration(out VariableDeclarationSyntax variableDeclaration)
@@ -1040,6 +1027,19 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                 arguments = argumentList.AsReadOnly();
 
                 return true;
+            }
+
+            bool ContainsModifierKind(IEnumerable<SyntaxToken> modifiers, SyntaxKind kind)
+            {
+                foreach (var modifier in modifiers)
+                {
+                    if (kind == modifier.Kind)
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
             }
         }
     }

@@ -143,7 +143,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                             {
                                 var returnStatement = statement as ReturnStatementSyntax;
 
-                                RealizeExpressionExcludeAssignment(returnStatement.Expression, scope, startReg, out int? endReg, out _);
+                                RealizeExpressionExcludeAssignment(returnStatement.Expression, scope, false, startReg, out int? endReg, out _);
 
                                 if (endReg is null)
                                 {
@@ -172,23 +172,60 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                                     }
                                 }
 
-                                RealizeVariableDeclaration(localDeclarationStatement.Declaration, scope, startReg, out _, out int lastReg);
-                                startReg = lastReg + 1;
+                                // RealizeVariableDeclaration(localDeclarationStatement.Declaration, scope, startReg, out _, out int lastReg);
+                                var variableDeclaration = localDeclarationStatement.Declaration;
 
-                                builder.Append(_delimiters[localDeclarationStatement.SemicolonToken.Kind]);
-
-                                bool ContainsModifierKind(IEnumerable<SyntaxToken> modifiers, SyntaxKind kind)
+                                foreach (var variable in variableDeclaration.Variables)
                                 {
-                                    foreach (var modifier in modifiers)
+                                    var identifier = variable.Identifier;
+
+                                    if (scope.Members.TryGetValue(($"{identifier.Value}", VARIABLE), out var value))
                                     {
-                                        if (kind == modifier.Kind)
+                                        throw new SemanticException();
+                                    }
+                                    else
+                                    {
+                                        builder.Append($"%{startReg} = {_directives[variable.Kind]} {_predefinedTypes[SyntaxKind.IntKeyword]}");
+                                        builder.AppendLine();
+
+                                        scope.Members.Add(($"{identifier.Value}", VARIABLE), ($"%{startReg}", localDeclarationStatement));
+                                        startReg++;
+                                    }
+                                }
+
+                                foreach (var variable in variableDeclaration.Variables)
+                                {
+                                    var identifier = variable.Identifier;
+
+                                    if (scope.TryLookup(($"{identifier.Value}", VARIABLE), out var value))
+                                    {
+                                        if (variable.Initializer is not null)
                                         {
-                                            return true;
+                                            bool mustConst = (value.node.Kind is SyntaxKind.LocalDeclarationStatement ?
+                                                    ContainsModifierKind((value.node as LocalDeclarationStatementSyntax).Modifiers, SyntaxKind.ConstKeyword) :
+                                                    false);
+
+                                            RealizeExpressionExcludeAssignment(variable.Initializer.Value, scope, mustConst, startReg, out int? tempEndReg, out _);
+
+                                            if (tempEndReg is null)
+                                            {
+                                                throw new SemanticException();
+                                            }
+
+                                            builder.Append($"{_directives[variable.Initializer.Kind]} {_predefinedTypes[SyntaxKind.IntKeyword]} %{tempEndReg}, {_predefinedTypes[SyntaxKind.IntKeyword]}* {value.regName}");
+                                            builder.AppendLine();
+
+                                            startReg = (int)tempEndReg + 1;
                                         }
                                     }
-
-                                    return false;
+                                    else
+                                    {
+                                        throw new SemanticException();
+                                    }
                                 }
+                                // startReg = lastReg + 1;
+
+                                builder.Append(_delimiters[localDeclarationStatement.SemicolonToken.Kind]);
                             }
 
                             break;
@@ -217,55 +254,55 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                 }
             }
 
-            void RealizeVariableDeclaration(VariableDeclarationSyntax variableDeclaration, MemberScope scope, int startReg, out int? endReg, out int lastReg)
-            {
-                foreach (var variable in variableDeclaration.Variables)
-                {
-                    var identifier = variable.Identifier;
+            // void RealizeVariableDeclaration(VariableDeclarationSyntax variableDeclaration, MemberScope scope, int startReg, out int? endReg, out int lastReg)
+            // {
+            //     foreach (var variable in variableDeclaration.Variables)
+            //     {
+            //         var identifier = variable.Identifier;
 
-                    if (scope.Members.TryGetValue(($"{identifier.Value}", VARIABLE), out var value))
-                    {
-                        throw new SemanticException();
-                    }
-                    else
-                    {
-                        builder.Append($"%{startReg} = {_directives[variable.Kind]} {_predefinedTypes[SyntaxKind.IntKeyword]}");
-                        builder.AppendLine();
+            //         if (scope.Members.TryGetValue(($"{identifier.Value}", VARIABLE), out var value))
+            //         {
+            //             throw new SemanticException();
+            //         }
+            //         else
+            //         {
+            //             builder.Append($"%{startReg} = {_directives[variable.Kind]} {_predefinedTypes[SyntaxKind.IntKeyword]}");
+            //             builder.AppendLine();
 
-                        scope.Members.Add(($"{identifier.Value}", VARIABLE), ($"%{startReg}", variable));
-                        startReg++;
-                    }
-                }
+            //             scope.Members.Add(($"{identifier.Value}", VARIABLE), ($"%{startReg}", variable));
+            //             startReg++;
+            //         }
+            //     }
 
-                foreach (var variable in variableDeclaration.Variables)
-                {
-                    var identifier = variable.Identifier;
+            //     foreach (var variable in variableDeclaration.Variables)
+            //     {
+            //         var identifier = variable.Identifier;
 
-                    if (scope.TryLookup(($"{identifier.Value}", VARIABLE), out var value))
-                    {
-                        if (variable.Initializer is not null)
-                        {
-                            RealizeExpressionExcludeAssignment(variable.Initializer.Value, scope, startReg, out int? tempEndReg, out _);
+            //         if (scope.TryLookup(($"{identifier.Value}", VARIABLE), out var value))
+            //         {
+            //             if (variable.Initializer is not null)
+            //             {
+            //                 RealizeExpressionExcludeAssignment(variable.Initializer.Value, scope, startReg, out int? tempEndReg, out _);
 
-                            if (tempEndReg is null)
-                            {
-                                throw new SemanticException();
-                            }
+            //                 if (tempEndReg is null)
+            //                 {
+            //                     throw new SemanticException();
+            //                 }
 
-                            builder.Append($"{_directives[variable.Initializer.Kind]} {_predefinedTypes[SyntaxKind.IntKeyword]} %{tempEndReg}, {_predefinedTypes[SyntaxKind.IntKeyword]}* {value.regName}");
-                            builder.AppendLine();
+            //                 builder.Append($"{_directives[variable.Initializer.Kind]} {_predefinedTypes[SyntaxKind.IntKeyword]} %{tempEndReg}, {_predefinedTypes[SyntaxKind.IntKeyword]}* {value.regName}");
+            //                 builder.AppendLine();
 
-                            startReg = (int)tempEndReg + 1;
-                        }
-                    }
-                    else
-                    {
-                        throw new SemanticException();
-                    }
-                }
+            //                 startReg = (int)tempEndReg + 1;
+            //             }
+            //         }
+            //         else
+            //         {
+            //             throw new SemanticException();
+            //         }
+            //     }
 
-                endReg = lastReg = startReg - 1;
-            }
+            //     endReg = lastReg = startReg - 1;
+            // }
 
             void RealizeExpression(ExpressionSyntax expression, MemberScope scope, int startReg, out int? endReg, out int lastReg)
             {
@@ -274,9 +311,12 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                     var simpleAssignmentExpression = expression as AssignmentExpressionSyntax;
                     var identifierName = simpleAssignmentExpression.Left as IdentifierNameSyntax;
 
-                    if (scope.TryLookup(($"{identifierName.Identifier.Value}", VARIABLE), out var value))
+                    if (scope.TryLookup(($"{identifierName.Identifier.Value}", VARIABLE), out var value) &&
+                        (value.node.Kind is SyntaxKind.LocalDeclarationStatement ?
+                        !ContainsModifierKind((value.node as LocalDeclarationStatementSyntax).Modifiers, SyntaxKind.ConstKeyword) :
+                        true))
                     {
-                        RealizeExpressionExcludeAssignment(simpleAssignmentExpression.Right, scope, startReg, out endReg, out lastReg);
+                        RealizeExpressionExcludeAssignment(simpleAssignmentExpression.Right, scope, false, startReg, out endReg, out lastReg);
 
                         if (endReg is null)
                         {
@@ -293,11 +333,11 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                 }
                 else
                 {
-                    RealizeExpressionExcludeAssignment(expression, scope, startReg, out endReg, out lastReg);
+                    RealizeExpressionExcludeAssignment(expression, scope, false, startReg, out endReg, out lastReg);
                 }
             }
 
-            void RealizeExpressionExcludeAssignment(ExpressionSyntax expression, MemberScope scope, int startReg, out int? endReg, out int lastReg)
+            void RealizeExpressionExcludeAssignment(ExpressionSyntax expression, MemberScope scope, bool mustConst, int startReg, out int? endReg, out int lastReg)
             {
                 switch (expression.Kind)
                 {
@@ -306,7 +346,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                         {
                             var prefixUnaryExpression = expression as PrefixUnaryExpressionSyntax;
 
-                            RealizeExpressionExcludeAssignment(prefixUnaryExpression.Operand, scope, startReg, out int? beforeEndReg, out _);
+                            RealizeExpressionExcludeAssignment(prefixUnaryExpression.Operand, scope, mustConst, startReg, out int? beforeEndReg, out _);
 
                             if (beforeEndReg is null)
                             {
@@ -335,12 +375,17 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                         {
                             var parenthesizedExpression = expression as ParenthesizedExpressionSyntax;
 
-                            RealizeExpressionExcludeAssignment(parenthesizedExpression.Expression, scope, startReg, out endReg, out lastReg);
+                            RealizeExpressionExcludeAssignment(parenthesizedExpression.Expression, scope, mustConst, startReg, out endReg, out lastReg);
                         }
 
                         break;
                     case SyntaxKind.InvocationExpression:
                         {
+                            if (mustConst)
+                            {
+                                throw new SemanticException();
+                            }
+
                             var invocationExpression = expression as InvocationExpressionSyntax;
                             var identifierName = invocationExpression.Expression as IdentifierNameSyntax;
 
@@ -414,6 +459,16 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
 
                             if (scope.TryLookup(($"{identifierName.Identifier.Value}", VARIABLE), out var value))
                             {
+                                if (mustConst)
+                                {
+                                    if ((value.node.Kind is SyntaxKind.LocalDeclarationStatement ?
+                                        !ContainsModifierKind((value.node as LocalDeclarationStatementSyntax).Modifiers, SyntaxKind.ConstKeyword) :
+                                        true))
+                                    {
+                                        throw new SemanticException();
+                                    }
+                                }
+
                                 builder.Append($"%{startReg} = {_directives[expression.Kind]} {_predefinedTypes[SyntaxKind.IntKeyword]}, {_predefinedTypes[SyntaxKind.IntKeyword]}* {value.regName}");
                                 builder.AppendLine();
 
@@ -434,14 +489,14 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                         {
                             var binaryExpression = expression as BinaryExpressionSyntax;
 
-                            RealizeExpressionExcludeAssignment(binaryExpression.Left, scope, startReg, out int? middleReg, out _);
+                            RealizeExpressionExcludeAssignment(binaryExpression.Left, scope, mustConst, startReg, out int? middleReg, out _);
 
                             if (middleReg is null)
                             {
                                 throw new SemanticException();
                             }
 
-                            RealizeExpressionExcludeAssignment(binaryExpression.Right, scope, (int)middleReg + 1, out int? beforeEndReg, out _);
+                            RealizeExpressionExcludeAssignment(binaryExpression.Right, scope, mustConst, (int)middleReg + 1, out int? beforeEndReg, out _);
 
                             if (beforeEndReg is null)
                             {
@@ -485,7 +540,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                 {
                     var argument = argumentList.Arguments[i];
 
-                    RealizeExpressionExcludeAssignment(argument.Expression, scope, startReg, out int? tempEndReg, out _);
+                    RealizeExpressionExcludeAssignment(argument.Expression, scope, false, startReg, out int? tempEndReg, out _);
 
                     if (tempEndReg is null)
                     {
@@ -500,6 +555,19 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                 endReg = lastReg = startReg - 1;
 
                 arguments = args;
+            }
+
+            bool ContainsModifierKind(IEnumerable<SyntaxToken> modifiers, SyntaxKind kind)
+            {
+                foreach (var modifier in modifiers)
+                {
+                    if (kind == modifier.Kind)
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
             }
         }
     }
