@@ -262,7 +262,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                                 throw new SemanticException();
                             }
 
-                            builder.Append($"%r{beforeEndReg + 1} = zext {_predefinedTypes[SyntaxKind.IntKeyword]} %r{beforeEndReg} to i1");
+                            builder.Append($"%r{beforeEndReg + 1} = {_directives[SyntaxKind.NotEqualsExpression]} {_predefinedTypes[SyntaxKind.IntKeyword]} %r{beforeEndReg}, 0");
                             builder.AppendLine();
 
                             if (ifStatement.Else is null)
@@ -757,9 +757,9 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                                     SyntaxKind.LogicalOrExpression or
                                     SyntaxKind.LogicalAndExpression)
                             {
-                                builder.Append($"%r{beforeEndReg + 1} = zext {_predefinedTypes[SyntaxKind.IntKeyword]} %r{middleReg} to i1");
+                                builder.Append($"%r{beforeEndReg + 1} = {_directives[SyntaxKind.NotEqualsExpression]} {_predefinedTypes[SyntaxKind.IntKeyword]} %r{middleReg}, 0");
                                 builder.AppendLine();
-                                builder.Append($"%r{beforeEndReg + 2} = zext {_predefinedTypes[SyntaxKind.IntKeyword]} %r{beforeEndReg} to i1");
+                                builder.Append($"%r{beforeEndReg + 2} = {_directives[SyntaxKind.NotEqualsExpression]} {_predefinedTypes[SyntaxKind.IntKeyword]} %r{beforeEndReg}, 0");
                                 builder.AppendLine();
                                 builder.Append($"%r{beforeEndReg + 3} = {_directives[expression.Kind]} i1 %r{beforeEndReg + 1}, %r{beforeEndReg + 2}");
                                 builder.AppendLine();
