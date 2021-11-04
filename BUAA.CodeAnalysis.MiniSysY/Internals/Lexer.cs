@@ -75,6 +75,38 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
 
                         break;
                     case '=':
+                    case '!':
+                    case '<':
+                    case '>':
+                        {
+                            char peekChar = textViewer.PeekChar(1);
+
+                            if (peekChar is '=')
+                            {
+                                var tokenBuilder = new StringBuilder();
+
+                                tokenBuilder.Append(c);
+                                tokenBuilder.Append(peekChar);
+
+                                var @operator = tokenBuilder.ToString();
+
+                                if (_operators.TryGetValue(@operator, out var tokenKind))
+                                {
+                                    textViewer.AdvanceChar(@operator.Length);
+                                    tokens.Add(new SyntaxToken() { Kind = tokenKind, Text = @operator });
+                                }
+                                else
+                                {
+                                    goto default;
+                                }
+                            }
+                            else
+                            {
+                                goto case '%';
+                            }
+                        }
+
+                        break;
                     case '+':
                     case '-':
                     case '*':
@@ -86,6 +118,66 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                             {
                                 textViewer.AdvanceChar(@operator.Length);
                                 tokens.Add(new SyntaxToken() { Kind = tokenKind, Text = @operator });
+                            }
+                            else
+                            {
+                                goto default;
+                            }
+                        }
+
+                        break;
+                    case '&':
+                        {
+                            char peekChar = textViewer.PeekChar(1);
+
+                            if (peekChar is '&')
+                            {
+                                var tokenBuilder = new StringBuilder();
+
+                                tokenBuilder.Append(c);
+                                tokenBuilder.Append(peekChar);
+
+                                var @operator = tokenBuilder.ToString();
+
+                                if (_operators.TryGetValue(@operator, out var tokenKind))
+                                {
+                                    textViewer.AdvanceChar(@operator.Length);
+                                    tokens.Add(new SyntaxToken() { Kind = tokenKind, Text = @operator });
+                                }
+                                else
+                                {
+                                    goto default;
+                                }
+                            }
+                            else
+                            {
+                                goto default;
+                            }
+                        }
+
+                        break;
+                    case '|':
+                        {
+                            char peekChar = textViewer.PeekChar(1);
+
+                            if (peekChar is '|')
+                            {
+                                var tokenBuilder = new StringBuilder();
+
+                                tokenBuilder.Append(c);
+                                tokenBuilder.Append(peekChar);
+
+                                var @operator = tokenBuilder.ToString();
+
+                                if (_operators.TryGetValue(@operator, out var tokenKind))
+                                {
+                                    textViewer.AdvanceChar(@operator.Length);
+                                    tokens.Add(new SyntaxToken() { Kind = tokenKind, Text = @operator });
+                                }
+                                else
+                                {
+                                    goto default;
+                                }
                             }
                             else
                             {
@@ -289,7 +381,9 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
         {
             { "int", SyntaxKind.IntKeyword },
             { "return", SyntaxKind.ReturnKeyword },
-            { "const", SyntaxKind.ConstKeyword }
+            { "const", SyntaxKind.ConstKeyword },
+            { "if", SyntaxKind.IfKeyword },
+            { "else", SyntaxKind.ElseKeyword }
         };
 
         private static readonly Dictionary<string, SyntaxKind> _delimiters = new()
@@ -309,7 +403,16 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
             { "*", SyntaxKind.AsteriskToken },
             { "/", SyntaxKind.SlashToken },
             { "%", SyntaxKind.PercentToken },
-            { "=", SyntaxKind.EqualsToken }
+            { "=", SyntaxKind.EqualsToken },
+            { "!", SyntaxKind.ExclamationToken },
+            { "<", SyntaxKind.LessThanToken },
+            { ">", SyntaxKind.GreaterThanToken },
+            { "==", SyntaxKind.EqualsEqualsToken },
+            { "!=", SyntaxKind.ExclamationEqualsToken },
+            { "<=", SyntaxKind.LessThanEqualsToken },
+            { ">=", SyntaxKind.GreaterThanEqualsToken },
+            { "&&", SyntaxKind.AmpersandAmpersandToken },
+            { "||", SyntaxKind.BarBarToken }
         };
     }
 }

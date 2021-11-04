@@ -11,9 +11,15 @@ namespace BUAA.CodeAnalysis.MiniSysY
 #if DEBUG
         private const string TestMiniSysYCodeText =
 @"int main() {
-    const int sudo = 0;
-    int rm = 5, r = 3, home = 5;
-    sudo = rm -r /home*       0;
+    int a;
+    a = 10;
+    if (+-!!!a) {
+        a = - - -1;
+    }
+    else {
+        a = 0;
+    }
+    putint(a);
     return 0;
 }";
 #endif
