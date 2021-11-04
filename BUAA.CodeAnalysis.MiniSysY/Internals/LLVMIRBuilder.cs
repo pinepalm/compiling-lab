@@ -565,7 +565,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                             {
                                 builder.Append($"%r{beforeEndReg + 1} = {_directives[SyntaxKind.EqualsExpression]} {_predefinedTypes[SyntaxKind.IntKeyword]} %r{beforeEndReg}, 0");
                                 builder.AppendLine();
-                                builder.Append($"%r{beforeEndReg + 2} = zext i1 %r{beforeEndReg} to {_predefinedTypes[SyntaxKind.IntKeyword]}");
+                                builder.Append($"%r{beforeEndReg + 2} = zext i1 %r{beforeEndReg + 1} to {_predefinedTypes[SyntaxKind.IntKeyword]}");
                                 builder.AppendLine();
 
                                 endReg = lastReg = (int)beforeEndReg + 2;
