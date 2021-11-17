@@ -72,6 +72,7 @@ namespace BUAA.CodeAnalysis.MiniSysY
         BarBarToken,
         IfStatement,
         ElseClause,
-        LogicalNotExpression
+        LogicalNotExpression,
+        FieldDeclaration
     }
 }

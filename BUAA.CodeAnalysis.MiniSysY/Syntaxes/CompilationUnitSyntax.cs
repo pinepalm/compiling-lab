@@ -19,6 +19,7 @@ namespace BUAA.CodeAnalysis.MiniSysY
 
             runtimeMethods.Add(new MethodDeclarationSyntax()
             {
+                Modifiers = (new List<SyntaxToken>()).AsReadOnly(),
                 ReturnType = new PredefinedTypeSyntax()
                 {
                     Keyword = new SyntaxToken()
@@ -61,6 +62,7 @@ namespace BUAA.CodeAnalysis.MiniSysY
 
             runtimeMethods.Add(new MethodDeclarationSyntax()
             {
+                Modifiers = (new List<SyntaxToken>()).AsReadOnly(),
                 ReturnType = new PredefinedTypeSyntax()
                 {
                     Keyword = new SyntaxToken()
@@ -103,6 +105,7 @@ namespace BUAA.CodeAnalysis.MiniSysY
 
             runtimeMethods.Add(new MethodDeclarationSyntax()
             {
+                Modifiers = (new List<SyntaxToken>()).AsReadOnly(),
                 ReturnType = new PredefinedTypeSyntax()
                 {
                     Keyword = new SyntaxToken()
@@ -161,6 +164,7 @@ namespace BUAA.CodeAnalysis.MiniSysY
 
             runtimeMethods.Add(new MethodDeclarationSyntax()
             {
+                Modifiers = (new List<SyntaxToken>()).AsReadOnly(),
                 ReturnType = new PredefinedTypeSyntax()
                 {
                     Keyword = new SyntaxToken()

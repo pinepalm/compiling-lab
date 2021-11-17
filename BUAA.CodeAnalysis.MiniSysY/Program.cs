@@ -10,16 +10,12 @@ namespace BUAA.CodeAnalysis.MiniSysY
 
 #if DEBUG
         private const string TestMiniSysYCodeText =
-@"int main() {
-    int a;
-    a = 10;
-    if (+-!!!a) {
-        a = - - -1;
-    }
-    else {
-        a = 0;
-    }
-    putint(a);
+@"int a = 6;
+int b = a + 1;
+int main() {
+    int c = b;
+    int b = 8;
+    putint(b + c);
     return 0;
 }";
 #endif

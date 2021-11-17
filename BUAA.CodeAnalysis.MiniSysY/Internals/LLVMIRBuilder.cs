@@ -25,6 +25,10 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                 {
                     switch (member.Kind)
                     {
+                        case SyntaxKind.FieldDeclaration:
+                            RealizeField(member as FieldDeclarationSyntax, scope);
+
+                            break;
                         case SyntaxKind.MethodDeclaration:
                             RealizeMethod(member as MethodDeclarationSyntax, scope);
 
@@ -37,6 +41,42 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
 
             return builder.ToString();
 
+            void RealizeField(FieldDeclarationSyntax field, MemberScope scope)
+            {
+                if (ContainsModifierKind(field.Modifiers, SyntaxKind.ConstKeyword))
+                {
+                    foreach (var variable in field.Declaration.Variables)
+                    {
+                        if (variable.Initializer is null)
+                        {
+                            throw new SemanticException();
+                        }
+                    }
+                }
+
+                var variableDeclaration = field.Declaration;
+
+                foreach (var variable in variableDeclaration.Variables)
+                {
+                    var identifier = variable.Identifier;
+
+                    if (scope.Members.TryGetValue(($"{identifier.Value}", VARIABLE), out _) ||
+                        scope.Members.TryGetValue(($"{identifier.Value}", METHOD), out _))
+                    {
+                        throw new SemanticException();
+                    }
+                    else
+                    {
+                        int value = variable.Initializer is not null ? CalculateExpressionExcludeAssignment(variable.Initializer.Value, scope) : 0;
+
+                        builder.Append($"@{identifier.Value} = dso_local global {_predefinedTypes[SyntaxKind.IntKeyword]} {value}");
+                        builder.AppendLine();
+
+                        scope.Members.Add(($"{identifier.Value}", VARIABLE), ($"@{identifier.Value}", field));
+                    }
+                }
+            }
+
             void RealizeMethod(MethodDeclarationSyntax method, MemberScope scope)
             {
                 if (method.Body is null)
@@ -45,9 +85,18 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                     builder.Append(" ");
                     RealizeType(method.ReturnType, scope);
                     builder.Append(" ");
-                    builder.Append($"@{method.Identifier.Value}");
 
-                    scope.Members.Add(($"{method.Identifier.Value}", METHOD), ($"@{method.Identifier.Value}", method));
+                    if (scope.Members.TryGetValue(($"{method.Identifier.Value}", VARIABLE), out _) ||
+                        scope.Members.TryGetValue(($"{method.Identifier.Value}", METHOD), out _))
+                    {
+                        throw new SemanticException();
+                    }
+                    else
+                    {
+                        builder.Append($"@{method.Identifier.Value}");
+
+                        scope.Members.Add(($"{method.Identifier.Value}", METHOD), ($"@{method.Identifier.Value}", method));
+                    }
 
                     var nextScope = new MemberScope(scope);
 
@@ -61,9 +110,18 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                     builder.Append(" ");
                     RealizeType(method.ReturnType, scope);
                     builder.Append(" ");
-                    builder.Append($"@{method.Identifier.Value}");
 
-                    scope.Members.Add(($"{method.Identifier.Value}", METHOD), ($"@{method.Identifier.Value}", method));
+                    if (scope.Members.TryGetValue(($"{method.Identifier.Value}", VARIABLE), out _) ||
+                        scope.Members.TryGetValue(($"{method.Identifier.Value}", METHOD), out _))
+                    {
+                        throw new SemanticException();
+                    }
+                    else
+                    {
+                        builder.Append($"@{method.Identifier.Value}");
+
+                        scope.Members.Add(($"{method.Identifier.Value}", METHOD), ($"@{method.Identifier.Value}", method));
+                    }
 
                     var nextScope = new MemberScope(scope);
 
@@ -177,7 +235,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                             {
                                 var identifier = variable.Identifier;
 
-                                if (scope.Members.TryGetValue(($"{identifier.Value}", VARIABLE), out var value))
+                                if (scope.Members.TryGetValue(($"{identifier.Value}", VARIABLE), out _))
                                 {
                                     throw new SemanticException();
                                 }
@@ -188,39 +246,63 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
 
                                     scope.Members.Add(($"{identifier.Value}", VARIABLE), ($"%r{startReg}", localDeclarationStatement));
                                     startReg++;
-                                }
-                            }
 
-                            foreach (var variable in variableDeclaration.Variables)
-                            {
-                                var identifier = variable.Identifier;
-
-                                if (scope.TryLookup(($"{identifier.Value}", VARIABLE), out var value))
-                                {
-                                    if (variable.Initializer is not null)
+                                    if (scope.TryLookup(($"{identifier.Value}", VARIABLE), out var value))
                                     {
-                                        bool mustConst = (value.node.Kind is SyntaxKind.LocalDeclarationStatement ?
-                                                ContainsModifierKind((value.node as LocalDeclarationStatementSyntax).Modifiers, SyntaxKind.ConstKeyword) :
-                                                false);
-
-                                        RealizeExpressionExcludeAssignment(variable.Initializer.Value, scope, mustConst, startReg, out int? tempEndReg, out _);
-
-                                        if (tempEndReg is null)
+                                        if (variable.Initializer is not null)
                                         {
-                                            throw new SemanticException();
+                                            bool mustConst = HasConst(value.node);
+
+                                            RealizeExpressionExcludeAssignment(variable.Initializer.Value, scope, mustConst, startReg, out int? tempEndReg, out _);
+
+                                            if (tempEndReg is null)
+                                            {
+                                                throw new SemanticException();
+                                            }
+
+                                            builder.Append($"{_directives[variable.Initializer.Kind]} {_predefinedTypes[SyntaxKind.IntKeyword]} %r{tempEndReg}, {_predefinedTypes[SyntaxKind.IntKeyword]}* {value.regName}");
+                                            builder.AppendLine();
+
+                                            startReg = (int)tempEndReg + 1;
                                         }
-
-                                        builder.Append($"{_directives[variable.Initializer.Kind]} {_predefinedTypes[SyntaxKind.IntKeyword]} %r{tempEndReg}, {_predefinedTypes[SyntaxKind.IntKeyword]}* {value.regName}");
-                                        builder.AppendLine();
-
-                                        startReg = (int)tempEndReg + 1;
+                                    }
+                                    else
+                                    {
+                                        throw new SemanticException();
                                     }
                                 }
-                                else
-                                {
-                                    throw new SemanticException();
-                                }
                             }
+
+                            // foreach (var variable in variableDeclaration.Variables)
+                            // {
+                            //     var identifier = variable.Identifier;
+
+                            //     if (scope.TryLookup(($"{identifier.Value}", VARIABLE), out var value))
+                            //     {
+                            //         if (variable.Initializer is not null)
+                            //         {
+                            //             bool mustConst = (value.node.Kind is SyntaxKind.LocalDeclarationStatement ?
+                            //                     ContainsModifierKind((value.node as LocalDeclarationStatementSyntax).Modifiers, SyntaxKind.ConstKeyword) :
+                            //                     false);
+
+                            //             RealizeExpressionExcludeAssignment(variable.Initializer.Value, scope, mustConst, startReg, out int? tempEndReg, out _);
+
+                            //             if (tempEndReg is null)
+                            //             {
+                            //                 throw new SemanticException();
+                            //             }
+
+                            //             builder.Append($"{_directives[variable.Initializer.Kind]} {_predefinedTypes[SyntaxKind.IntKeyword]} %r{tempEndReg}, {_predefinedTypes[SyntaxKind.IntKeyword]}* {value.regName}");
+                            //             builder.AppendLine();
+
+                            //             startReg = (int)tempEndReg + 1;
+                            //         }
+                            //     }
+                            //     else
+                            //     {
+                            //         throw new SemanticException();
+                            //     }
+                            // }
 
                             endReg = lastReg = startReg - 1;
 
@@ -519,9 +601,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                     var identifierName = simpleAssignmentExpression.Left as IdentifierNameSyntax;
 
                     if (scope.TryLookup(($"{identifierName.Identifier.Value}", VARIABLE), out var value) &&
-                        (value.node.Kind is SyntaxKind.LocalDeclarationStatement ?
-                        !ContainsModifierKind((value.node as LocalDeclarationStatementSyntax).Modifiers, SyntaxKind.ConstKeyword) :
-                        true))
+                        !HasConst(value.node))
                     {
                         RealizeExpressionExcludeAssignment(simpleAssignmentExpression.Right, scope, false, startReg, out endReg, out lastReg);
 
@@ -563,7 +643,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
 
                             if (expression.Kind is SyntaxKind.LogicalNotExpression)
                             {
-                                builder.Append($"%r{beforeEndReg + 1} = {_directives[SyntaxKind.EqualsExpression]} {_predefinedTypes[SyntaxKind.IntKeyword]} %r{beforeEndReg}, 0");
+                                builder.Append($"%r{beforeEndReg + 1} = {_directives[expression.Kind]} {_predefinedTypes[SyntaxKind.IntKeyword]} %r{beforeEndReg}, 0");
                                 builder.AppendLine();
                                 builder.Append($"%r{beforeEndReg + 2} = zext i1 %r{beforeEndReg + 1} to {_predefinedTypes[SyntaxKind.IntKeyword]}");
                                 builder.AppendLine();
@@ -681,9 +761,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                             {
                                 if (mustConst)
                                 {
-                                    if ((value.node.Kind is SyntaxKind.LocalDeclarationStatement ?
-                                        !ContainsModifierKind((value.node as LocalDeclarationStatementSyntax).Modifiers, SyntaxKind.ConstKeyword) :
-                                        true))
+                                    if (!HasConst(value.node))
                                     {
                                         throw new SemanticException();
                                     }
@@ -813,6 +891,100 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                 arguments = args;
             }
 
+            int CalculateExpressionExcludeAssignment(ExpressionSyntax expression, MemberScope scope)
+            {
+                switch (expression.Kind)
+                {
+                    case SyntaxKind.LogicalNotExpression:
+                        throw new SemanticException();
+
+                    case SyntaxKind.UnaryPlusExpression:
+                    case SyntaxKind.UnaryMinusExpression:
+                        {
+                            var prefixUnaryExpression = expression as PrefixUnaryExpressionSyntax;
+
+                            int res = CalculateExpressionExcludeAssignment(prefixUnaryExpression.Operand, scope);
+
+                            return expression.Kind is SyntaxKind.UnaryMinusExpression ? -res : res;
+                        }
+
+                    case SyntaxKind.NumericLiteralExpression:
+                        {
+                            var literalExpression = expression as LiteralExpressionSyntax;
+
+                            return (int)literalExpression.Token.Value;
+                        }
+
+                    case SyntaxKind.ParenthesizedExpression:
+                        {
+                            var parenthesizedExpression = expression as ParenthesizedExpressionSyntax;
+
+                            int res = CalculateExpressionExcludeAssignment(parenthesizedExpression.Expression, scope);
+
+                            return res;
+                        }
+
+                    case SyntaxKind.InvocationExpression:
+                        throw new SemanticException();
+
+                    case SyntaxKind.IdentifierName:
+                        {
+                            var identifierName = expression as IdentifierNameSyntax;
+
+                            if (scope.TryLookup(($"{identifierName.Identifier.Value}", VARIABLE), out var value))
+                            {
+                                if (!HasConst(value.node))
+                                {
+                                    throw new SemanticException();
+                                }
+
+                                int res = CalculateExpressionExcludeAssignment(GetConstantDeclarationExpression(value.node, $"{identifierName.Identifier.Value}"), scope);
+
+                                return res;
+                            }
+                            else
+                            {
+                                throw new SemanticException();
+                            }
+                        }
+
+                    case SyntaxKind.AddExpression:
+                    case SyntaxKind.SubtractExpression:
+                    case SyntaxKind.MultiplyExpression:
+                    case SyntaxKind.DivideExpression:
+                    case SyntaxKind.ModuloExpression:
+                    case SyntaxKind.LogicalOrExpression:
+                    case SyntaxKind.LogicalAndExpression:
+                    case SyntaxKind.EqualsExpression:
+                    case SyntaxKind.NotEqualsExpression:
+                    case SyntaxKind.LessThanExpression:
+                    case SyntaxKind.LessThanOrEqualExpression:
+                    case SyntaxKind.GreaterThanExpression:
+                    case SyntaxKind.GreaterThanOrEqualExpression:
+                        {
+                            var binaryExpression = expression as BinaryExpressionSyntax;
+
+                            int leftRes = CalculateExpressionExcludeAssignment(binaryExpression.Left, scope);
+
+                            int rightRes = CalculateExpressionExcludeAssignment(binaryExpression.Right, scope);
+
+                            return expression.Kind switch
+                            {
+                                SyntaxKind.ModuloExpression => leftRes % rightRes,
+                                SyntaxKind.AddExpression => leftRes + rightRes,
+                                SyntaxKind.SubtractExpression => leftRes - rightRes,
+                                SyntaxKind.MultiplyExpression => leftRes * rightRes,
+                                SyntaxKind.DivideExpression => leftRes / rightRes,
+                                _ => throw new SemanticException()
+
+                            };
+                        }
+
+                    default:
+                        throw new SemanticException();
+                }
+            }
+
             bool ContainsModifierKind(IEnumerable<SyntaxToken> modifiers, SyntaxKind kind)
             {
                 foreach (var modifier in modifiers)
@@ -824,6 +996,33 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                 }
 
                 return false;
+            }
+
+            bool HasConst(SyntaxNode node)
+            {
+                return (node.Kind is SyntaxKind.LocalDeclarationStatement or SyntaxKind.FieldDeclaration ?
+                        ContainsModifierKind((node.Kind is SyntaxKind.LocalDeclarationStatement ? (node as LocalDeclarationStatementSyntax).Modifiers : (node as FieldDeclarationSyntax).Modifiers), SyntaxKind.ConstKeyword) :
+                        false);
+            }
+
+            ExpressionSyntax GetConstantDeclarationExpression(SyntaxNode node, string identifierName)
+            {
+                var variables = (node.Kind switch
+                {
+                    SyntaxKind.LocalDeclarationStatement => (node as LocalDeclarationStatementSyntax).Declaration,
+                    SyntaxKind.FieldDeclaration => (node as FieldDeclarationSyntax).Declaration,
+                    _ => throw new SemanticException()
+                }).Variables;
+
+                foreach (var variable in variables)
+                {
+                    if (identifierName.Equals(variable.Identifier.Value))
+                    {
+                        return variable.Initializer.Value;
+                    }
+                }
+
+                return null;
             }
         }
     }
@@ -863,6 +1062,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
 
             { SyntaxKind.LogicalOrExpression, "or" },
             { SyntaxKind.LogicalAndExpression, "and" },
+            { SyntaxKind.LogicalNotExpression, "icmp eq" },
             { SyntaxKind.EqualsExpression, "icmp eq" },
             { SyntaxKind.NotEqualsExpression, "icmp ne" },
             { SyntaxKind.LessThanExpression, "icmp slt" },

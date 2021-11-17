@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace BUAA.CodeAnalysis.MiniSysY
 {
     public abstract class MemberDeclarationSyntax : SyntaxNode
@@ -7,5 +9,7 @@ namespace BUAA.CodeAnalysis.MiniSysY
         {
 
         }
+
+        public abstract IReadOnlyList<SyntaxToken> Modifiers { get; init; }
     }
 }

@@ -25,10 +25,33 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
 
                 switch (token.Kind)
                 {
-                    case SyntaxKind.IntKeyword:
-                        if (!ParseMethod())
+                    case SyntaxKind.ConstKeyword:
                         {
-                            goto default;
+                            if (ParseField(out var field))
+                            {
+                                members.Add(field);
+                            }
+                            else
+                            {
+                                goto default;
+                            }
+                        }
+
+                        break;
+                    case SyntaxKind.IntKeyword:
+                        {
+                            if (ParseMethod(out var method))
+                            {
+                                members.Add(method);
+                            }
+                            else if (ParseField(out var field))
+                            {
+                                members.Add(field);
+                            }
+                            else
+                            {
+                                goto default;
+                            }
                         }
 
                         break;
@@ -39,13 +62,44 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
 
             return new CompilationUnitSyntax() { Members = members.AsReadOnly() };
 
-            bool ParseMethod()
+            bool ParseField(out MemberDeclarationSyntax field)
+            {
+                int position = tokenListViewer.Position;
+
+                if (ParseVariableModifiers(out var variableModifiers) &&
+                    ParseVariableDeclaration(out var variableDeclaration))
+                {
+                    var endToken = tokenListViewer.PeekToken();
+
+                    if (endToken.Kind is SyntaxKind.SemicolonToken)
+                    {
+                        tokenListViewer.AdvanceToken();
+
+                        field = new FieldDeclarationSyntax()
+                        {
+                            Modifiers = variableModifiers,
+                            Declaration = variableDeclaration,
+                            SemicolonToken = endToken
+                        };
+
+                        return true;
+                    }
+                }
+
+                tokenListViewer.Reset(position);
+
+                field = null;
+
+                return false;
+            }
+
+            bool ParseMethod(out MemberDeclarationSyntax method)
             {
                 // only 1 main method
-                if (members.Count is 1)
-                {
-                    return false;
-                }
+                // if (members.Count is 1)
+                // {
+                //     return false;
+                // }
 
                 int position = tokenListViewer.Position;
 
@@ -54,19 +108,22 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                     ParseParameterList(out var parameterList) &&
                     ParseBlock(out var body))
                 {
-                    members.Add(new MethodDeclarationSyntax()
+                    method = new MethodDeclarationSyntax()
                     {
+                        Modifiers = (new List<SyntaxToken>()).AsReadOnly(),
                         ReturnType = returnType,
                         Identifier = identifier,
                         ParameterList = parameterList,
                         Body = (BlockSyntax)body,
                         SemicolonToken = null
-                    });
+                    };
 
                     return true;
                 }
 
                 tokenListViewer.Reset(position);
+
+                method = null;
 
                 return false;
             }
