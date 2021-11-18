@@ -73,6 +73,12 @@ namespace BUAA.CodeAnalysis.MiniSysY
         IfStatement,
         ElseClause,
         LogicalNotExpression,
-        FieldDeclaration
+        FieldDeclaration,
+        WhileKeyword,
+        WhileStatement,
+        BreakKeyword,
+        BreakStatement,
+        ContinueKeyword,
+        ContinueStatement
     }
 }

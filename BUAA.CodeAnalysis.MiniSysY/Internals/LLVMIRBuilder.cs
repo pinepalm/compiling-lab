@@ -187,11 +187,11 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
             {
                 builder.Append(_delimiters[body.OpenBraceToken.Kind]);
                 builder.AppendLine();
-                RealizeStatements(body.Statements, scope, startReg, out _, out _);
+                RealizeStatements(body.Statements, scope, null, null, startReg, out _, out _);
                 builder.Append(_delimiters[body.CloseBraceToken.Kind]);
             }
 
-            void RealizeStatement(StatementSyntax statement, MemberScope scope, int startReg, out int? endReg, out int lastReg)
+            void RealizeStatement(StatementSyntax statement, MemberScope scope, string loopStartTag, string loopEndTag, int startReg, out int? endReg, out int lastReg)
             {
                 switch (statement.Kind)
                 {
@@ -354,7 +354,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                                 builder.Append($"r{beforeEndReg + 2}:");
                                 builder.AppendLine();
 
-                                RealizeStatement(ifStatement.Statement, scope, (int)beforeEndReg + 5, out _, out lastReg);
+                                RealizeStatement(ifStatement.Statement, scope, loopStartTag, loopEndTag, (int)beforeEndReg + 5, out _, out lastReg);
 
                                 builder.Append($"br label %r{beforeEndReg + 3}");
                                 builder.AppendLine();
@@ -374,7 +374,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                                 builder.Append($"r{beforeEndReg + 2}:");
                                 builder.AppendLine();
 
-                                RealizeStatement(ifStatement.Statement, scope, (int)beforeEndReg + 6, out _, out int middleReg);
+                                RealizeStatement(ifStatement.Statement, scope, loopStartTag, loopEndTag, (int)beforeEndReg + 6, out _, out int middleReg);
 
                                 builder.Append($"br label %r{beforeEndReg + 4}");
                                 builder.AppendLine();
@@ -382,7 +382,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                                 builder.Append($"r{beforeEndReg + 3}:");
                                 builder.AppendLine();
 
-                                RealizeStatement(ifStatement.Else.Statement, scope, middleReg + 1, out _, out lastReg);
+                                RealizeStatement(ifStatement.Else.Statement, scope, loopStartTag, loopEndTag, middleReg + 1, out _, out lastReg);
 
                                 builder.Append($"br label %r{beforeEndReg + 4}");
                                 builder.AppendLine();
@@ -404,9 +404,80 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
 
                             var nextScope = new MemberScope(scope);
 
-                            RealizeStatements(block.Statements, nextScope, startReg, out endReg, out lastReg);
+                            RealizeStatements(block.Statements, nextScope, loopStartTag, loopEndTag, startReg, out endReg, out lastReg);
 
                             endReg = lastReg;
+                        }
+
+                        break;
+                    case SyntaxKind.WhileStatement:
+                        {
+                            var whileStatement = statement as WhileStatementSyntax;
+
+                            builder.Append($"br label %r{startReg}");
+                            builder.AppendLine();
+                            builder.Append($"r{startReg}:");
+                            builder.AppendLine();
+
+                            RealizeExpressionExcludeAssignment(whileStatement.Condition, scope, false, startReg + 1, out int? beforeEndReg, out int beforeLastReg);
+
+                            if (beforeEndReg is null)
+                            {
+                                throw new SemanticException();
+                            }
+
+                            builder.Append($"%r{beforeEndReg + 1} = {_directives[SyntaxKind.NotEqualsExpression]} {_predefinedTypes[SyntaxKind.IntKeyword]} %r{beforeEndReg}, 0");
+                            builder.AppendLine();
+
+                            builder.Append($"br i1 %r{beforeEndReg + 1}, label %r{beforeEndReg + 2}, label %r{beforeEndReg + 3}");
+                            builder.AppendLine();
+                            builder.Append($"r{beforeEndReg + 2}:");
+                            builder.AppendLine();
+
+                            RealizeStatement(whileStatement.Statement, scope, $"%r{startReg}", $"%r{beforeEndReg + 3}", (int)beforeEndReg + 5, out _, out lastReg);
+
+                            builder.Append($"br label %r{startReg}");
+                            builder.AppendLine();
+
+                            builder.Append($"r{beforeEndReg + 3}:");
+                            builder.AppendLine();
+                            // nop
+                            builder.Append($"%r{beforeEndReg + 4} = {_directives[SyntaxKind.AddExpression]} {_predefinedTypes[SyntaxKind.IntKeyword]} 0, 0");
+                            builder.AppendLine();
+
+                            endReg = lastReg;
+                        }
+
+                        break;
+                    case SyntaxKind.BreakStatement:
+                        {
+                            var breakStatement = statement as BreakStatementSyntax;
+
+                            if (loopEndTag is null)
+                            {
+                                throw new SemanticException();
+                            }
+
+                            builder.Append($"br label {loopEndTag}");
+                            builder.AppendLine();
+
+                            endReg = lastReg = startReg - 1;
+                        }
+
+                        break;
+                    case SyntaxKind.ContinueStatement:
+                        {
+                            var continueStatement = statement as ContinueStatementSyntax;
+
+                            if (loopStartTag is null)
+                            {
+                                throw new SemanticException();
+                            }
+
+                            builder.Append($"br label {loopStartTag}");
+                            builder.AppendLine();
+
+                            endReg = lastReg = startReg - 1;
                         }
 
                         break;
@@ -417,7 +488,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                 }
             }
 
-            void RealizeStatements(IReadOnlyList<StatementSyntax> statements, MemberScope scope, int startReg, out int? endReg, out int lastReg)
+            void RealizeStatements(IReadOnlyList<StatementSyntax> statements, MemberScope scope, string loopStartTag, string loopEndTag, int startReg, out int? endReg, out int lastReg)
             {
                 foreach (var statement in statements)
                 {
@@ -536,7 +607,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                     //         break;
                     // }
 
-                    RealizeStatement(statement, scope, startReg, out _, out int tempLastReg);
+                    RealizeStatement(statement, scope, loopStartTag, loopEndTag, startReg, out _, out int tempLastReg);
                     startReg = tempLastReg + 1;
                 }
 

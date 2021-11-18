@@ -292,6 +292,39 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                                 goto default;
                             }
                         }
+                    case SyntaxKind.WhileKeyword:
+                        {
+                            if (ParseWhileStatement(out statement))
+                            {
+                                return true;
+                            }
+                            else
+                            {
+                                goto default;
+                            }
+                        }
+                    case SyntaxKind.BreakKeyword:
+                        {
+                            if (ParseBreakStatement(out statement))
+                            {
+                                return true;
+                            }
+                            else
+                            {
+                                goto default;
+                            }
+                        }
+                    case SyntaxKind.ContinueKeyword:
+                        {
+                            if (ParseContinueStatement(out statement))
+                            {
+                                return true;
+                            }
+                            else
+                            {
+                                goto default;
+                            }
+                        }
                     default:
                         {
                             if (ParseExpressionStatement(out statement))
@@ -331,6 +364,120 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                 statements = statementList;
 
                 return true;
+            }
+
+            bool ParseBreakStatement(out StatementSyntax statement)
+            {
+                int position = tokenListViewer.Position;
+
+                var token = tokenListViewer.PeekToken();
+
+                if (token.Kind is SyntaxKind.BreakKeyword)
+                {
+                    tokenListViewer.AdvanceToken();
+
+                    var endToken = tokenListViewer.PeekToken();
+
+                    if (endToken.Kind is SyntaxKind.SemicolonToken)
+                    {
+                        tokenListViewer.AdvanceToken();
+
+                        statement = new BreakStatementSyntax()
+                        {
+                            BreakKeyword = token,
+                            SemicolonToken = endToken
+                        };
+
+                        return true;
+                    }
+                }
+
+                tokenListViewer.Reset(position);
+
+                statement = null;
+
+                return false;
+            }
+
+            bool ParseContinueStatement(out StatementSyntax statement)
+            {
+                int position = tokenListViewer.Position;
+
+                var token = tokenListViewer.PeekToken();
+
+                if (token.Kind is SyntaxKind.ContinueKeyword)
+                {
+                    tokenListViewer.AdvanceToken();
+
+                    var endToken = tokenListViewer.PeekToken();
+
+                    if (endToken.Kind is SyntaxKind.SemicolonToken)
+                    {
+                        tokenListViewer.AdvanceToken();
+
+                        statement = new ContinueStatementSyntax()
+                        {
+                            ContinueKeyword = token,
+                            SemicolonToken = endToken
+                        };
+
+                        return true;
+                    }
+                }
+
+                tokenListViewer.Reset(position);
+
+                statement = null;
+
+                return false;
+            }
+
+            bool ParseWhileStatement(out StatementSyntax statement)
+            {
+                int position = tokenListViewer.Position;
+                var token = tokenListViewer.PeekToken();
+
+                if (token.Kind is SyntaxKind.WhileKeyword)
+                {
+                    tokenListViewer.AdvanceToken();
+
+                    var peekToken = tokenListViewer.PeekToken();
+
+                    if (peekToken.Kind is SyntaxKind.OpenParenToken)
+                    {
+                        tokenListViewer.AdvanceToken();
+
+                        if (ParseExpressionExcludeAssignment(out var expression, _conditionExpressionAllowOperators))
+                        {
+                            var peekToken1 = tokenListViewer.PeekToken();
+
+                            if (peekToken1.Kind is SyntaxKind.CloseParenToken)
+                            {
+                                tokenListViewer.AdvanceToken();
+
+                                if (ParseStatement(out var innerStatement))
+                                {
+                                    statement = new WhileStatementSyntax()
+                                    {
+                                        WhileKeyword = token,
+                                        OpenParenToken = peekToken,
+                                        Condition = expression,
+                                        CloseParenToken = peekToken1,
+                                        Statement = innerStatement
+                                    };
+
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                tokenListViewer.Reset(position);
+
+                statement = null;
+
+                return false;
             }
 
             bool ParseReturnStatement(out StatementSyntax statement)

@@ -383,7 +383,10 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
             { "return", SyntaxKind.ReturnKeyword },
             { "const", SyntaxKind.ConstKeyword },
             { "if", SyntaxKind.IfKeyword },
-            { "else", SyntaxKind.ElseKeyword }
+            { "else", SyntaxKind.ElseKeyword },
+            { "while", SyntaxKind.WhileKeyword },
+            { "break", SyntaxKind.BreakKeyword },
+            { "continue", SyntaxKind.ContinueKeyword }
         };
 
         private static readonly Dictionary<string, SyntaxKind> _delimiters = new()
