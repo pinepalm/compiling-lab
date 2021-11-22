@@ -79,6 +79,12 @@ namespace BUAA.CodeAnalysis.MiniSysY
         BreakKeyword,
         BreakStatement,
         ContinueKeyword,
-        ContinueStatement
+        ContinueStatement,
+        OpenBracketToken,
+        CloseBracketToken,
+        ArrayRankSpecifier,
+        ArrayInitializerExpression,
+        ElementAccessExpression,
+        BracketedArgument
     }
 }

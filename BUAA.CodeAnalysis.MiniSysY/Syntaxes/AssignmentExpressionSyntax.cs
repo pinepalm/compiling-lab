@@ -9,7 +9,7 @@ namespace BUAA.CodeAnalysis.MiniSysY
         }
 
         public ExpressionSyntax Left { get; init; }
-        
+
         public SyntaxToken OperatorToken { get; init; }
 
         public ExpressionSyntax Right { get; init; }

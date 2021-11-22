@@ -4,8 +4,8 @@ namespace BUAA.CodeAnalysis.MiniSysY
 {
     public readonly struct SyntaxTrivia : IEquatable<SyntaxTrivia>
     {
-        public static readonly SyntaxTrivia Empty = new() 
-        { 
+        public static readonly SyntaxTrivia Empty = new()
+        {
             Kind = SyntaxKind.None,
         };
 

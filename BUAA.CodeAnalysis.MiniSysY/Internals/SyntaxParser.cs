@@ -95,12 +95,6 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
 
             bool ParseMethod(out MemberDeclarationSyntax method)
             {
-                // only 1 main method
-                // if (members.Count is 1)
-                // {
-                //     return false;
-                // }
-
                 int position = tokenListViewer.Position;
 
                 if (ParseReturnType(out var returnType) &&
@@ -653,6 +647,8 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                 {
                     tokenListViewer.AdvanceToken();
 
+                    ParseRankSpecifiers(out var rankSpecifiers);
+
                     var peekToken = tokenListViewer.PeekToken();
 
                     if (peekToken.Kind is SyntaxKind.EqualsToken &&
@@ -661,6 +657,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                         variableDeclarator = new VariableDeclaratorSyntax()
                         {
                             Identifier = token,
+                            RankSpecifiers = rankSpecifiers,
                             Initializer = equalsValueClause
                         };
 
@@ -671,6 +668,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                         variableDeclarator = new VariableDeclaratorSyntax()
                         {
                             Identifier = token,
+                            RankSpecifiers = rankSpecifiers,
                             Initializer = null
                         };
 
@@ -683,6 +681,65 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                 return false;
             }
 
+            bool ParseRankSpecifiers(out IReadOnlyList<ArrayRankSpecifierSyntax> rankSpecifiers)
+            {
+                var rankSpecifierList = new List<ArrayRankSpecifierSyntax>();
+                int position = tokenListViewer.Position;
+
+                while (true)
+                {
+                    if (ParseRankSpecifier(out var rankSpecifier))
+                    {
+                        position = tokenListViewer.Position;
+
+                        rankSpecifierList.Add(rankSpecifier);
+                    }
+                    else
+                    {
+                        tokenListViewer.Reset(position);
+
+                        break;
+                    }
+                }
+
+                rankSpecifiers = rankSpecifierList.AsReadOnly();
+
+                return true;
+            }
+
+            bool ParseRankSpecifier(out ArrayRankSpecifierSyntax rankSpecifier)
+            {
+                var token = tokenListViewer.PeekToken();
+
+                if (token.Kind is SyntaxKind.OpenBracketToken)
+                {
+                    tokenListViewer.AdvanceToken();
+
+                    if (ParseExpressionExcludeAssignment(out var expression, _defaultExpressionAllowOperators))
+                    {
+                        var peekToken = tokenListViewer.PeekToken();
+
+                        if (peekToken.Kind is SyntaxKind.CloseBracketToken)
+                        {
+                            tokenListViewer.AdvanceToken();
+
+                            rankSpecifier = new ArrayRankSpecifierSyntax()
+                            {
+                                OpenBracketToken = token,
+                                Size = expression,
+                                CloseBracketToken = peekToken
+                            };
+
+                            return true;
+                        }
+                    }
+                }
+
+                rankSpecifier = null;
+
+                return false;
+            }
+
             bool ParseEqualsValueClause(out EqualsValueClauseSyntax equalsValueClause)
             {
                 var token = tokenListViewer.PeekToken();
@@ -691,21 +748,138 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                 {
                     tokenListViewer.AdvanceToken();
 
-                    if (ParseExpressionExcludeAssignment(out var expression, _defaultExpressionAllowOperators))
-                    {
-                        equalsValueClause = new EqualsValueClauseSyntax()
-                        {
-                            EqualsToken = token,
-                            Value = expression
-                        };
+                    var peekToken = tokenListViewer.PeekToken();
 
-                        return true;
+                    if (peekToken.Kind is SyntaxKind.OpenBraceToken)
+                    {
+                        if (ParseInitializerExpression(out var expression))
+                        {
+                            equalsValueClause = new EqualsValueClauseSyntax()
+                            {
+                                EqualsToken = token,
+                                Value = expression
+                            };
+
+                            return true;
+                        }
+                    }
+                    else
+                    {
+                        if (ParseExpressionExcludeAssignment(out var expression, _defaultExpressionAllowOperators))
+                        {
+                            equalsValueClause = new EqualsValueClauseSyntax()
+                            {
+                                EqualsToken = token,
+                                Value = expression
+                            };
+
+                            return true;
+                        }
                     }
                 }
 
                 equalsValueClause = null;
 
                 return false;
+            }
+
+            bool ParseInitializerExpression(out ExpressionSyntax expression)
+            {
+                var token = tokenListViewer.PeekToken();
+
+                if (token.Kind is SyntaxKind.OpenBraceToken)
+                {
+                    tokenListViewer.AdvanceToken();
+
+                    if (ParseExpressions(out var expressions))
+                    {
+                        var peekToken = tokenListViewer.PeekToken();
+
+                        if (peekToken.Kind is SyntaxKind.CloseBraceToken)
+                        {
+                            tokenListViewer.AdvanceToken();
+
+                            expression = new InitializerExpressionSyntax(SyntaxKind.ArrayInitializerExpression)
+                            {
+                                OpenBraceToken = token,
+                                Expressions = expressions,
+                                CloseBraceToken = peekToken
+                            };
+
+                            return true;
+                        }
+                    }
+                }
+
+                expression = null;
+
+                return false;
+            }
+
+            bool ParseExpressions(out IReadOnlyList<ExpressionSyntax> expressions)
+            {
+                var expressionList = new List<ExpressionSyntax>();
+                int position = tokenListViewer.Position;
+
+                while (true)
+                {
+                    if (ParseExpressionExcludeAssignment(out var expression, _defaultExpressionAllowOperators))
+                    {
+                        position = tokenListViewer.Position;
+
+                        expressionList.Add(expression);
+
+                        var token = tokenListViewer.PeekToken();
+
+                        if (token.Kind is SyntaxKind.CommaToken)
+                        {
+                            tokenListViewer.AdvanceToken();
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        tokenListViewer.Reset(position);
+
+                        var token = tokenListViewer.PeekToken();
+
+                        if (token.Kind is SyntaxKind.CommaToken)
+                        {
+                            tokenListViewer.AdvanceToken();
+                        }
+
+                        if (ParseInitializerExpression(out var innerExpression))
+                        {
+                            position = tokenListViewer.Position;
+
+                            expressionList.Add(innerExpression);
+
+                            var peekToken = tokenListViewer.PeekToken();
+
+                            if (peekToken.Kind is SyntaxKind.CommaToken)
+                            {
+                                tokenListViewer.AdvanceToken();
+                            }
+                            else
+                            {
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            tokenListViewer.Reset(position);
+
+                            break;
+                        }
+                    }
+                }
+
+                expressions = expressionList.AsReadOnly();
+
+                return true;
             }
 
             bool ParseExpressionStatement(out StatementSyntax statement)
@@ -877,21 +1051,21 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
 
             bool ParseExpression(out ExpressionSyntax expression, HashSet<SyntaxKind> allowOperators)
             {
+                int position = tokenListViewer.Position;
                 var token = tokenListViewer.PeekToken();
-                var peekToken = tokenListViewer.PeekToken(1);
+                var peekToken = SyntaxToken.Empty;
 
-                if (token.Kind is SyntaxKind.IdentifierToken && peekToken.Kind is SyntaxKind.EqualsToken)
+                if (token.Kind is SyntaxKind.IdentifierToken &&
+                    ParseIdentifierNameOrElementAccessExpression(out var targetExpression, _defaultExpressionAllowOperators) &&
+                    (peekToken = tokenListViewer.PeekToken()).Kind is SyntaxKind.EqualsToken)
                 {
-                    tokenListViewer.AdvanceToken(2);
+                    tokenListViewer.AdvanceToken();
 
                     if (ParseExpressionExcludeAssignment(out var innerExpression, allowOperators))
                     {
                         expression = new AssignmentExpressionSyntax(SyntaxKind.SimpleAssignmentExpression)
                         {
-                            Left = new IdentifierNameSyntax()
-                            {
-                                Identifier = token
-                            },
+                            Left = targetExpression,
                             OperatorToken = peekToken,
                             Right = innerExpression
                         };
@@ -901,6 +1075,8 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                 }
                 else
                 {
+                    tokenListViewer.Reset(position);
+
                     if (ParseExpressionExcludeAssignment(out var innerExpression, allowOperators))
                     {
                         expression = innerExpression;
@@ -909,6 +1085,8 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                     }
                 }
 
+                tokenListViewer.Reset(position);
+
                 expression = null;
 
                 return false;
@@ -916,48 +1094,6 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
 
             bool ParseExpressionExcludeAssignment(out ExpressionSyntax expression, HashSet<SyntaxKind> allowOperators)
             {
-                // if (ParseExpressionCore(out var leftExpression, null))
-                // {
-                //     var token = tokenListViewer.PeekToken();
-
-                //     if (_precedenceOfOperators.ContainsKey(token.Kind))
-                //     {
-                //         int position = tokenListViewer.Position;
-
-                //         tokenListViewer.AdvanceToken();
-
-                //         if (ParseExpression(out var rightExpression))
-                //         {
-                //             expression = new BinaryExpressionSyntax(_binaryExpressionKindOfOperators[token.Kind])
-                //             {
-                //                 Left = leftExpression,
-                //                 OperatorToken = token,
-                //                 Right = rightExpression
-                //             };
-
-                //             return true;
-                //         }
-                //         else
-                //         {
-                //             tokenListViewer.Reset(position);
-
-                //             expression = leftExpression;
-
-                //             return true;
-                //         }
-                //     }
-                //     else
-                //     {
-                //         expression = leftExpression;
-
-                //         return true;
-                //     }
-                // }
-
-                // expression = null;
-
-                // return false;
-
                 var samePrecedenceExpressionList = new List<ExpressionSyntax>();
                 var operatorList = new List<SyntaxToken>();
                 int position = tokenListViewer.Position;
@@ -990,29 +1126,6 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                         operatorList.RemoveAt(operatorList.Count - 1);
                         tokenListViewer.Reset(position);
                     }
-
-                    // while (operatorLinkedList.Any())
-                    // {
-                    //     var leftExpression = samePrecedenceExpressionLinkedList.First();
-                    //     samePrecedenceExpressionLinkedList.RemoveFirst();
-
-                    //     var @operator = operatorLinkedList.First();
-                    //     operatorLinkedList.RemoveFirst();
-
-                    //     var rightExpression = samePrecedenceExpressionLinkedList.First();
-                    //     samePrecedenceExpressionLinkedList.RemoveFirst();
-
-                    //     var binaryExpression = new BinaryExpressionSyntax(_binaryExpressionKindOfOperators[@operator.Kind])
-                    //     {
-                    //         Left = leftExpression,
-                    //         OperatorToken = @operator,
-                    //         Right = rightExpression
-                    //     };
-
-                    //     samePrecedenceExpressionLinkedList.AddFirst(binaryExpression);
-                    // }
-
-                    // expression = samePrecedenceExpressionLinkedList.First();
 
                     expression = MergeExpressions(samePrecedenceExpressionList, operatorList);
 
@@ -1126,63 +1239,6 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
 
             bool ParseExpressionExcludeAssignmentCore(out ExpressionSyntax expression, HashSet<SyntaxKind> allowOperators)
             {
-                // if (ParsePrefixUnaryOrLiteralOrParenthesizedExpression(out var leftExpression))
-                // {
-                //     var token = tokenListViewer.PeekToken();
-
-                //     if (_precedenceOfOperators.TryGetValue(token.Kind, out var precedenceOfOperator))
-                //     {
-                //         if (precedence is null || precedence == precedenceOfOperator)
-                //         {
-                //             int position = tokenListViewer.Position;
-
-                //             tokenListViewer.AdvanceToken();
-
-                //             if (ParseExpressionCore(out var rightExpression, precedenceOfOperator))
-                //             {
-                //                 expression = new BinaryExpressionSyntax(_binaryExpressionKindOfOperators[token.Kind])
-                //                 {
-                //                     Left = leftExpression,
-                //                     OperatorToken = token,
-                //                     Right = rightExpression
-                //                 };
-
-                //                 return true;
-                //             }
-                //             else
-                //             {
-                //                 tokenListViewer.Reset(position);
-
-                //                 expression = leftExpression;
-
-                //                 return true;
-                //             }
-                //         }
-                //         else if (precedence > precedenceOfOperator)
-                //         {
-                //             expression = leftExpression;
-
-                //             return true;
-                //         }
-                //         else
-                //         {
-                //             expression = null;
-
-                //             return false;
-                //         }
-                //     }
-                //     else
-                //     {
-                //         expression = leftExpression;
-
-                //         return true;
-                //     }
-                // }
-
-                // expression = null;
-
-                // return false;
-
                 var primitiveExpressionLinkedList = new LinkedList<ExpressionSyntax>();
                 var operatorLinkedList = new LinkedList<SyntaxToken>();
                 int position = tokenListViewer.Position;
@@ -1277,7 +1333,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                         return ParseParenthesizedExpression(out expression, allowOperators);
 
                     case SyntaxKind.IdentifierToken:
-                        return ParseIdentifierNameOrInvocationExpression(out expression, allowOperators);
+                        return ParseIdentifierNameOrInvocationOrElementAccessExpression(out expression, allowOperators);
 
                     default:
                         break;
@@ -1368,8 +1424,9 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                 return false;
             }
 
-            bool ParseIdentifierNameOrInvocationExpression(out ExpressionSyntax expression, HashSet<SyntaxKind> allowOperators)
+            bool ParseIdentifierNameOrInvocationOrElementAccessExpression(out ExpressionSyntax expression, HashSet<SyntaxKind> allowOperators)
             {
+                int position = tokenListViewer.Position;
                 var token = tokenListViewer.PeekToken();
 
                 if (token.Kind is SyntaxKind.IdentifierToken)
@@ -1385,6 +1442,42 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                                 Identifier = token
                             },
                             ArgumentList = argumentList
+                        };
+
+                        return true;
+                    }
+                    else
+                    {
+                        tokenListViewer.Reset(position);
+
+                        return ParseIdentifierNameOrElementAccessExpression(out expression, allowOperators);
+                    }
+                }
+
+                tokenListViewer.Reset(position);
+
+                expression = null;
+
+                return false;
+            }
+
+            bool ParseIdentifierNameOrElementAccessExpression(out ExpressionSyntax expression, HashSet<SyntaxKind> allowOperators)
+            {
+                var token = tokenListViewer.PeekToken();
+
+                if (token.Kind is SyntaxKind.IdentifierToken)
+                {
+                    tokenListViewer.AdvanceToken();
+
+                    if (ParseBracketedArgumentList(out var arguments, allowOperators))
+                    {
+                        expression = new ElementAccessExpressionSyntax()
+                        {
+                            Expression = new IdentifierNameSyntax()
+                            {
+                                Identifier = token
+                            },
+                            Arguments = arguments
                         };
 
                         return true;
@@ -1476,6 +1569,85 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                 arguments = argumentList.AsReadOnly();
 
                 return true;
+            }
+
+            bool ParseBracketedArgumentList(out IReadOnlyList<BracketedArgumentSyntax> arguments, HashSet<SyntaxKind> allowOperators)
+            {
+                if (ParseBracketedArguments(out var innerArguments, allowOperators))
+                {
+                    if (innerArguments is not null && innerArguments.Any())
+                    {
+                        arguments = innerArguments;
+
+                        return true;
+                    }
+                }
+
+                arguments = null;
+
+                return false;
+            }
+
+            bool ParseBracketedArguments(out IReadOnlyList<BracketedArgumentSyntax> arguments, HashSet<SyntaxKind> allowOperators)
+            {
+                var argumentList = new List<BracketedArgumentSyntax>();
+                int position = tokenListViewer.Position;
+
+                while (true)
+                {
+                    if (ParseBracketedArgument(out var argument, allowOperators))
+                    {
+                        position = tokenListViewer.Position;
+
+                        argumentList.Add(argument);
+                    }
+                    else
+                    {
+                        tokenListViewer.Reset(position);
+
+                        break;
+                    }
+                }
+
+                arguments = argumentList.AsReadOnly();
+
+                return true;
+            }
+
+            bool ParseBracketedArgument(out BracketedArgumentSyntax argument, HashSet<SyntaxKind> allowOperators)
+            {
+                var token = tokenListViewer.PeekToken();
+
+                if (token.Kind is SyntaxKind.OpenBracketToken)
+                {
+                    tokenListViewer.AdvanceToken();
+
+                    if (ParseExpressionExcludeAssignment(out var expression, allowOperators))
+                    {
+                        var peekToken = tokenListViewer.PeekToken();
+
+                        if (peekToken.Kind is SyntaxKind.CloseBracketToken)
+                        {
+                            tokenListViewer.AdvanceToken();
+
+                            argument = new BracketedArgumentSyntax()
+                            {
+                                OpenBracketToken = token,
+                                Argument = new ArgumentSyntax()
+                                {
+                                    Expression = expression
+                                },
+                                CloseBracketToken = peekToken
+                            };
+
+                            return true;
+                        }
+                    }
+                }
+
+                argument = null;
+
+                return false;
             }
 
             bool ContainsModifierKind(IEnumerable<SyntaxToken> modifiers, SyntaxKind kind)

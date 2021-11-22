@@ -4,8 +4,8 @@ namespace BUAA.CodeAnalysis.MiniSysY
 {
     public readonly struct SyntaxToken : IEquatable<SyntaxToken>
     {
-        public static readonly SyntaxToken Empty = new() 
-        { 
+        public static readonly SyntaxToken Empty = new()
+        {
             Kind = SyntaxKind.None,
             Text = null,
             Value = null

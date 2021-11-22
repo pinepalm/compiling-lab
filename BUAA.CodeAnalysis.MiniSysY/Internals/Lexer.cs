@@ -36,6 +36,8 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                         break;
                     case '(':
                     case ')':
+                    case '[':
+                    case ']':
                     case '{':
                     case '}':
                     case ';':
@@ -393,6 +395,8 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
         {
             { "(", SyntaxKind.OpenParenToken },
             { ")", SyntaxKind.CloseParenToken },
+            { "[", SyntaxKind.OpenBracketToken },
+            { "]", SyntaxKind.CloseBracketToken },
             { "{", SyntaxKind.OpenBraceToken },
             { "}", SyntaxKind.CloseBraceToken },
             { ";", SyntaxKind.SemicolonToken },

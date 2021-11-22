@@ -13,7 +13,7 @@ namespace BUAA.CodeAnalysis.MiniSysY
         public SyntaxToken OpenParenToken { get; init; }
 
         public override IReadOnlyList<ArgumentSyntax> Arguments { get; init; }
-        
+
         public SyntaxToken CloseParenToken { get; init; }
     }
 }

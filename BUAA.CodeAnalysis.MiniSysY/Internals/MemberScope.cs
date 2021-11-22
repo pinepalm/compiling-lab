@@ -15,11 +15,11 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
             Parent = parent;
         }
 
-        public Dictionary<(string name, string type), (string regName, SyntaxNode node)> Members { get; } = new();
+        public Dictionary<(string name, string kind), MemberInfo> Members { get; } = new();
 
         public MemberScope Parent { get; }
 
-        public bool TryLookup((string name, string type) key, out (string regName, SyntaxNode node) value)
+        public bool TryLookup((string name, string kind) key, out MemberInfo value)
         {
             var scope = this;
 
@@ -35,7 +35,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                 scope = scope.Parent;
             }
 
-            value = (null, null);
+            value = null;
 
             return false;
         }

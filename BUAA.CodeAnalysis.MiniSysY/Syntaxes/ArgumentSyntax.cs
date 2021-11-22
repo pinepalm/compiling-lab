@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace BUAA.CodeAnalysis.MiniSysY
 {
     public class ArgumentSyntax : SyntaxNode

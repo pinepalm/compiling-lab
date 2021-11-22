@@ -10,25 +10,10 @@ namespace BUAA.CodeAnalysis.MiniSysY
 
 #if DEBUG
         private const string TestMiniSysYCodeText =
-@"int main() {
-    const int ch = 48;
-    int i = 1;
-    while (i < 12) {
-        int j = 0;
-        while (1 == 1) {
-            if (j % 3 == 1) {
-                putch(ch + 1);
-            } else {
-                putch(ch);
-            }
-            j = j + 1;
-            if (j >= 2 * i - 1)
-                break;
-        }
-        putch(10);
-        i = i + 1;
-        continue; // something meaningless
-    }
+@"int arr[2][2] = {{1, 1}, {4, 5}};
+int main() {
+    arr[1] = 2;
+    putint(arr[1][0]);
     return 0;
 }";
 #endif
@@ -82,10 +67,17 @@ namespace BUAA.CodeAnalysis.MiniSysY
 #endif
 
             }
+#if DEBUG
+            finally
+            {
+
+            }
+#else
             catch (Exception)
             {
                 Environment.Exit(1);
             }
+#endif
         }
     }
 }
