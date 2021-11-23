@@ -1083,16 +1083,19 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                                     throw new SemanticException();
                                 }
 
-                                builder.Append($"%r{tempEndReg + 1} = getelementptr");
+                                builder.Append($"%r{tempEndReg + 1} = {_directives[SyntaxKind.IdentifierName]} {GenerateParameterArrayType(ranks, scope, baseType, 0)}, {GenerateParameterArrayType(ranks, scope, baseType, 0)} * {arrayName}");
+                                builder.AppendLine();
+
+                                builder.Append($"%r{tempEndReg + 2} = getelementptr");
                                 builder.Append(" ");
                                 RealizeLocalDeclarationArrayType(ranks, scope, baseType, 1);
                                 builder.Append(", ");
                                 RealizeLocalDeclarationArrayType(ranks, scope, baseType, 1);
-                                builder.Append($"* {arrayName}, {_predefinedTypes[SyntaxKind.IntKeyword]} %r{tempEndReg}");
+                                builder.Append($"* %r{tempEndReg + 1}, {_predefinedTypes[SyntaxKind.IntKeyword]} %r{tempEndReg}");
                                 builder.AppendLine();
 
-                                arrayName = $"%r{tempEndReg + 1}";
-                                startReg = (int)tempEndReg + 2;
+                                arrayName = $"%r{tempEndReg + 2}";
+                                startReg = (int)tempEndReg + 3;
 
                                 for (int i = 1; i < elementAccessExpression.Arguments.Count; i++)
                                 {
@@ -1356,16 +1359,19 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                                         throw new SemanticException();
                                     }
 
-                                    builder.Append($"%r{tempEndReg + 1} = getelementptr");
+                                    builder.Append($"%r{tempEndReg + 1} = {_directives[SyntaxKind.IdentifierName]} {GenerateParameterArrayType(ranks, scope, baseType, 0)}, {GenerateParameterArrayType(ranks, scope, baseType, 0)} * {arrayName}");
+                                    builder.AppendLine();
+
+                                    builder.Append($"%r{tempEndReg + 2} = getelementptr");
                                     builder.Append(" ");
                                     RealizeLocalDeclarationArrayType(ranks, scope, baseType, 1);
                                     builder.Append(", ");
                                     RealizeLocalDeclarationArrayType(ranks, scope, baseType, 1);
-                                    builder.Append($"* {arrayName}, {_predefinedTypes[SyntaxKind.IntKeyword]} %r{tempEndReg}");
+                                    builder.Append($"* %r{tempEndReg + 1}, {_predefinedTypes[SyntaxKind.IntKeyword]} %r{tempEndReg}");
                                     builder.AppendLine();
 
-                                    arrayName = $"%r{tempEndReg + 1}";
-                                    startReg = (int)tempEndReg + 2;
+                                    arrayName = $"%r{tempEndReg + 2}";
+                                    startReg = (int)tempEndReg + 3;
 
                                     for (int i = 1; i < elementAccessExpression.Arguments.Count; i++)
                                     {
@@ -1569,16 +1575,19 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                                         throw new SemanticException();
                                     }
 
-                                    builder.Append($"%r{tempEndReg + 1} = getelementptr");
+                                    builder.Append($"%r{tempEndReg + 1} = {_directives[SyntaxKind.IdentifierName]} {GenerateParameterArrayType(ranks, scope, baseType, 0)}, {GenerateParameterArrayType(ranks, scope, baseType, 0)} * {arrayName}");
+                                    builder.AppendLine();
+
+                                    builder.Append($"%r{tempEndReg + 2} = getelementptr");
                                     builder.Append(" ");
                                     RealizeLocalDeclarationArrayType(ranks, scope, baseType, 1);
                                     builder.Append(", ");
                                     RealizeLocalDeclarationArrayType(ranks, scope, baseType, 1);
-                                    builder.Append($"* {arrayName}, {_predefinedTypes[SyntaxKind.IntKeyword]} %r{tempEndReg}");
+                                    builder.Append($"* %r{tempEndReg + 1}, {_predefinedTypes[SyntaxKind.IntKeyword]} %r{tempEndReg}");
                                     builder.AppendLine();
 
-                                    arrayName = $"%r{tempEndReg + 1}";
-                                    startReg = (int)tempEndReg + 2;
+                                    arrayName = $"%r{tempEndReg + 2}";
+                                    startReg = (int)tempEndReg + 3;
 
                                     if (elementAccessExpression.Arguments.Count > 1)
                                     {
@@ -1653,6 +1662,14 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                                     builder.Append(", ");
                                     RealizeLocalDeclarationArrayType(ranks, scope, baseType, 0);
                                     builder.Append($"* {arrayName}, {_predefinedTypes[SyntaxKind.IntKeyword]} 0, {_predefinedTypes[SyntaxKind.IntKeyword]} 0");
+                                    builder.AppendLine();
+
+                                    arrayName = $"%r{startReg}";
+                                    startReg++;
+                                }
+                                else
+                                {
+                                    builder.Append($"%r{startReg} = {_directives[SyntaxKind.IdentifierName]} {GenerateParameterArrayType(ranks, scope, baseType, 0)}, {GenerateParameterArrayType(ranks, scope, baseType, 0)} * {arrayName}");
                                     builder.AppendLine();
 
                                     arrayName = $"%r{startReg}";
