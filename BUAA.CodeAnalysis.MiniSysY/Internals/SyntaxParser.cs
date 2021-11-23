@@ -55,6 +55,19 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                         }
 
                         break;
+                    case SyntaxKind.VoidKeyword:
+                        {
+                            if (ParseMethod(out var method))
+                            {
+                                members.Add(method);
+                            }
+                            else
+                            {
+                                goto default;
+                            }
+                        }
+
+                        break;
                     default:
                         throw new SyntaxException();
                 }
@@ -126,7 +139,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
             {
                 var token = tokenListViewer.PeekToken();
 
-                if (token.Kind is SyntaxKind.IntKeyword)
+                if (token.Kind is SyntaxKind.IntKeyword or SyntaxKind.VoidKeyword)
                 {
                     tokenListViewer.AdvanceToken();
 
@@ -146,15 +159,11 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
 
                 if (token.Kind is SyntaxKind.IdentifierToken)
                 {
-                    // only main identifier is valid
-                    if (token.Value is "main")
-                    {
-                        tokenListViewer.AdvanceToken();
+                    tokenListViewer.AdvanceToken();
 
-                        identifier = token;
+                    identifier = token;
 
-                        return true;
-                    }
+                    return true;
                 }
 
                 identifier = SyntaxToken.Empty;
@@ -168,24 +177,103 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
 
                 if (token.Kind is SyntaxKind.OpenParenToken)
                 {
-                    var peekToken = tokenListViewer.PeekToken(1);
+                    tokenListViewer.AdvanceToken();
 
-                    if (peekToken.Kind is SyntaxKind.CloseParenToken)
+                    if (ParseParameters(out var parameters))
                     {
-                        tokenListViewer.AdvanceToken(2);
+                        var peekToken = tokenListViewer.PeekToken();
 
-                        parameterList = new ParameterListSyntax()
+                        if (peekToken.Kind is SyntaxKind.CloseParenToken)
                         {
-                            OpenParenToken = token,
-                            Parameters = (new List<ParameterSyntax>()).AsReadOnly(),
-                            CloseParenToken = peekToken
-                        };
+                            tokenListViewer.AdvanceToken();
 
-                        return true;
+                            parameterList = new ParameterListSyntax()
+                            {
+                                OpenParenToken = token,
+                                Parameters = parameters,
+                                CloseParenToken = peekToken
+                            };
+
+                            return true;
+                        }
                     }
                 }
 
                 parameterList = null;
+
+                return false;
+            }
+
+            bool ParseParameters(out IReadOnlyList<ParameterSyntax> parameters)
+            {
+                var parameterList = new List<ParameterSyntax>();
+                int position = tokenListViewer.Position;
+
+                while (true)
+                {
+                    if (ParseParameter(out var parameter))
+                    {
+                        position = tokenListViewer.Position;
+
+                        parameterList.Add(parameter);
+
+                        var token = tokenListViewer.PeekToken();
+
+                        if (token.Kind is SyntaxKind.CommaToken)
+                        {
+                            tokenListViewer.AdvanceToken();
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        tokenListViewer.Reset(position);
+
+                        break;
+                    }
+                }
+
+                parameters = parameterList.AsReadOnly();
+
+                return true;
+            }
+
+            bool ParseParameter(out ParameterSyntax parameter)
+            {
+                var token = tokenListViewer.PeekToken();
+
+                if (token.Kind is SyntaxKind.IntKeyword)
+                {
+                    tokenListViewer.AdvanceToken();
+
+                    var peekToken = tokenListViewer.PeekToken();
+
+                    if (peekToken.Kind is SyntaxKind.IdentifierToken)
+                    {
+                        tokenListViewer.AdvanceToken();
+
+                        if (ParseRankSpecifiers(out var rankSpecifiers, true))
+                        {
+                            parameter = new ParameterSyntax()
+                            {
+                                Modifiers = (new List<SyntaxToken>()).AsReadOnly(),
+                                Type = new PredefinedTypeSyntax()
+                                {
+                                    Keyword = token
+                                },
+                                Identifier = peekToken,
+                                RankSpecifiers = rankSpecifiers
+                            };
+
+                            return true;
+                        }
+                    }
+                }
+
+                parameter = null;
 
                 return false;
             }
@@ -484,23 +572,22 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                 {
                     tokenListViewer.AdvanceToken();
 
-                    if (ParseExpressionExcludeAssignment(out var expression, _defaultExpressionAllowOperators))
+                    ParseExpressionExcludeAssignment(out var expression, _defaultExpressionAllowOperators);
+
+                    var endToken = tokenListViewer.PeekToken();
+
+                    if (endToken.Kind is SyntaxKind.SemicolonToken)
                     {
-                        var endToken = tokenListViewer.PeekToken();
+                        tokenListViewer.AdvanceToken();
 
-                        if (endToken.Kind is SyntaxKind.SemicolonToken)
+                        statement = new ReturnStatementSyntax()
                         {
-                            tokenListViewer.AdvanceToken();
+                            ReturnKeyword = token,
+                            Expression = expression,
+                            SemicolonToken = endToken
+                        };
 
-                            statement = new ReturnStatementSyntax()
-                            {
-                                ReturnKeyword = token,
-                                Expression = expression,
-                                SemicolonToken = endToken
-                            };
-
-                            return true;
-                        }
+                        return true;
                     }
                 }
 
@@ -647,32 +734,33 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                 {
                     tokenListViewer.AdvanceToken();
 
-                    ParseRankSpecifiers(out var rankSpecifiers);
-
-                    var peekToken = tokenListViewer.PeekToken();
-
-                    if (peekToken.Kind is SyntaxKind.EqualsToken &&
-                        ParseEqualsValueClause(out var equalsValueClause))
+                    if (ParseRankSpecifiers(out var rankSpecifiers, false))
                     {
-                        variableDeclarator = new VariableDeclaratorSyntax()
-                        {
-                            Identifier = token,
-                            RankSpecifiers = rankSpecifiers,
-                            Initializer = equalsValueClause
-                        };
+                        var peekToken = tokenListViewer.PeekToken();
 
-                        return true;
-                    }
-                    else
-                    {
-                        variableDeclarator = new VariableDeclaratorSyntax()
+                        if (peekToken.Kind is SyntaxKind.EqualsToken &&
+                            ParseEqualsValueClause(out var equalsValueClause))
                         {
-                            Identifier = token,
-                            RankSpecifiers = rankSpecifiers,
-                            Initializer = null
-                        };
+                            variableDeclarator = new VariableDeclaratorSyntax()
+                            {
+                                Identifier = token,
+                                RankSpecifiers = rankSpecifiers,
+                                Initializer = equalsValueClause
+                            };
 
-                        return true;
+                            return true;
+                        }
+                        else
+                        {
+                            variableDeclarator = new VariableDeclaratorSyntax()
+                            {
+                                Identifier = token,
+                                RankSpecifiers = rankSpecifiers,
+                                Initializer = null
+                            };
+
+                            return true;
+                        }
                     }
                 }
 
@@ -681,7 +769,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                 return false;
             }
 
-            bool ParseRankSpecifiers(out IReadOnlyList<ArrayRankSpecifierSyntax> rankSpecifiers)
+            bool ParseRankSpecifiers(out IReadOnlyList<ArrayRankSpecifierSyntax> rankSpecifiers, bool allowFirstEmpty)
             {
                 var rankSpecifierList = new List<ArrayRankSpecifierSyntax>();
                 int position = tokenListViewer.Position;
@@ -690,6 +778,18 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                 {
                     if (ParseRankSpecifier(out var rankSpecifier))
                     {
+                        if (rankSpecifier.Size is null)
+                        {
+                            if (rankSpecifierList.Any() || !allowFirstEmpty)
+                            {
+                                tokenListViewer.Reset(position);
+
+                                rankSpecifiers = null;
+
+                                return false;
+                            }
+                        }
+
                         position = tokenListViewer.Position;
 
                         rankSpecifierList.Add(rankSpecifier);
@@ -715,23 +815,22 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                 {
                     tokenListViewer.AdvanceToken();
 
-                    if (ParseExpressionExcludeAssignment(out var expression, _defaultExpressionAllowOperators))
+                    ParseExpressionExcludeAssignment(out var expression, _defaultExpressionAllowOperators);
+
+                    var peekToken = tokenListViewer.PeekToken();
+
+                    if (peekToken.Kind is SyntaxKind.CloseBracketToken)
                     {
-                        var peekToken = tokenListViewer.PeekToken();
+                        tokenListViewer.AdvanceToken();
 
-                        if (peekToken.Kind is SyntaxKind.CloseBracketToken)
+                        rankSpecifier = new ArrayRankSpecifierSyntax()
                         {
-                            tokenListViewer.AdvanceToken();
+                            OpenBracketToken = token,
+                            Size = expression,
+                            CloseBracketToken = peekToken
+                        };
 
-                            rankSpecifier = new ArrayRankSpecifierSyntax()
-                            {
-                                OpenBracketToken = token,
-                                Size = expression,
-                                CloseBracketToken = peekToken
-                            };
-
-                            return true;
-                        }
+                        return true;
                     }
                 }
 

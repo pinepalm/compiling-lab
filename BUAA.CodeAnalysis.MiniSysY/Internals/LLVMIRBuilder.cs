@@ -40,6 +40,12 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                             break;
                     }
                 }
+
+                if (!scope.Members.TryGetValue((MAIN, METHOD), out var value) ||
+                    ((value.Node as MethodDeclarationSyntax).ReturnType as PredefinedTypeSyntax).Keyword.Kind is not SyntaxKind.IntKeyword)
+                {
+                    throw new SemanticException();
+                }
             }
 
             return builder.ToString();
@@ -271,7 +277,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
 
                     RealizeParameterList(method.ParameterList, nextScope);
 
-                    RealizeBody(method.Body, nextScope, method.ParameterList.Parameters.Count + 1);
+                    RealizeBody(method.Body, nextScope, method, method.ParameterList.Parameters.Count + 1);
                 }
             }
 
@@ -291,6 +297,35 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                 }
             }
 
+            void RealizeParameterArrayType(int[] ranks, MemberScope scope, TypeSyntax baseType)
+            {
+                RealizeParameterArrayTypeCore(ranks, scope, baseType, 0);
+            }
+
+            void RealizeParameterArrayTypeCore(int[] ranks, MemberScope scope, TypeSyntax baseType, int index)
+            {
+                if (index >= ranks.Length)
+                {
+                    RealizeType(baseType, scope);
+
+                    return;
+                }
+
+                if (index is 0)
+                {
+                    RealizeParameterArrayTypeCore(ranks, scope, baseType, index + 1);
+                    builder.Append("*");
+                }
+                else
+                {
+                    int rank = ranks[index];
+
+                    builder.Append($"[{rank} x ");
+                    RealizeParameterArrayTypeCore(ranks, scope, baseType, index + 1);
+                    builder.Append("]");
+                }
+            }
+
             void RealizeParameterList(ParameterListSyntax parameterList, MemberScope scope)
             {
                 builder.Append($"{_delimiters[parameterList.OpenParenToken.Kind]}");
@@ -299,28 +334,81 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                 {
                     var parameter = parameterList.Parameters[i];
 
-                    RealizeType(parameter.Type, scope);
-
-                    if (parameter.Identifier is not null)
+                    if (parameter.RankSpecifiers?.Any() ?? false)
                     {
-                        var identifier = (SyntaxToken)(parameter.Identifier);
+                        int[] ranks = new int[parameter.RankSpecifiers.Count];
 
-                        if (scope.Members.TryGetValue(($"{identifier.Value}", VARIABLE), out var value))
+                        for (int j = 0; j < parameter.RankSpecifiers.Count; j++)
                         {
-                            throw new SemanticException();
-                        }
-                        else
-                        {
-                            builder.Append(" ");
-                            builder.Append($"%r{i}");
+                            var rankSpecifier = parameter.RankSpecifiers[j];
 
-                            scope.Members.Add(($"{identifier.Value}", VARIABLE), new()
+                            if (rankSpecifier.Size is null)
                             {
-                                Name = $"{identifier.Value}",
-                                ActualName = $"%r{i}",
-                                Kind = VARIABLE,
-                                Node = parameter
-                            });
+                                ranks[j] = -1;
+                            }
+                            else
+                            {
+                                int rank = CalculateExpressionExcludeAssignment(rankSpecifier.Size, scope);
+
+                                if (rank < 0)
+                                {
+                                    throw new SemanticException();
+                                }
+
+                                ranks[j] = rank;
+                            }
+                        }
+
+                        RealizeParameterArrayType(ranks, scope, parameter.Type);
+
+                        if (parameter.Identifier is not null)
+                        {
+                            var identifier = (SyntaxToken)(parameter.Identifier);
+
+                            if (scope.Members.TryGetValue(($"{identifier.Value}", VARIABLE), out var value))
+                            {
+                                throw new SemanticException();
+                            }
+                            else
+                            {
+                                builder.Append(" ");
+                                builder.Append($"%r{i}");
+
+                                scope.Members.Add(($"{identifier.Value}", VARIABLE), new MemberInfo()
+                                {
+                                    Name = $"{identifier.Value}",
+                                    ActualName = $"%r{i}",
+                                    Kind = VARIABLE,
+                                    Node = parameter
+                                }.WithProperty(RANKS, ranks));
+                            }
+                        }
+                    }
+                    else
+                    {
+                        RealizeType(parameter.Type, scope);
+
+                        if (parameter.Identifier is not null)
+                        {
+                            var identifier = (SyntaxToken)(parameter.Identifier);
+
+                            if (scope.Members.TryGetValue(($"{identifier.Value}", VARIABLE), out var value))
+                            {
+                                throw new SemanticException();
+                            }
+                            else
+                            {
+                                builder.Append(" ");
+                                builder.Append($"%r{i}");
+
+                                scope.Members.Add(($"{identifier.Value}", VARIABLE), new()
+                                {
+                                    Name = $"{identifier.Value}",
+                                    ActualName = $"%r{i}",
+                                    Kind = VARIABLE,
+                                    Node = parameter
+                                });
+                            }
                         }
                     }
 
@@ -333,12 +421,20 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                 builder.Append($"{_delimiters[parameterList.CloseParenToken.Kind]}");
             }
 
-            void RealizeBody(BlockSyntax body, MemberScope scope, int startReg)
+            void RealizeBody(BlockSyntax body, MemberScope scope, MethodDeclarationSyntax method, int startReg)
             {
                 builder.Append(_delimiters[body.OpenBraceToken.Kind]);
                 builder.AppendLine();
-                RealizeStatements(body.Statements, scope, null, null, startReg, out _, out _);
+                RealizeStatements(body.Statements, scope, method, null, null, startReg, out _, out _);
+
+                if ((method.ReturnType as PredefinedTypeSyntax).Keyword.Kind is SyntaxKind.VoidKeyword)
+                {
+                    builder.Append($"{_directives[SyntaxKind.ReturnKeyword]} {_predefinedTypes[SyntaxKind.VoidKeyword]}");
+                    builder.AppendLine();
+                }
+
                 builder.Append(_delimiters[body.CloseBraceToken.Kind]);
+                builder.AppendLine();
             }
 
             void RealizeLocalDeclarationArrayType(int[] ranks, MemberScope scope, TypeSyntax baseType, int index)
@@ -506,7 +602,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                 }
             }
 
-            void RealizeStatement(StatementSyntax statement, MemberScope scope, string loopStartTag, string loopEndTag, int startReg, out int? endReg, out int lastReg)
+            void RealizeStatement(StatementSyntax statement, MemberScope scope, MethodDeclarationSyntax method, string loopStartTag, string loopEndTag, int startReg, out int? endReg, out int lastReg)
             {
                 switch (statement.Kind)
                 {
@@ -514,17 +610,41 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                         {
                             var returnStatement = statement as ReturnStatementSyntax;
 
-                            RealizeExpressionExcludeAssignment(returnStatement.Expression, scope, false, startReg, out endReg, out lastReg);
+                            if ((method.ReturnType as PredefinedTypeSyntax).Keyword.Kind is SyntaxKind.IntKeyword)
+                            {
+                                if (returnStatement.Expression is null)
+                                {
+                                    throw new SemanticException();
+                                }
 
-                            if (endReg is null)
+                                RealizeExpressionExcludeAssignment(returnStatement.Expression, scope, false, startReg, out endReg, out lastReg);
+
+                                if (endReg is null)
+                                {
+                                    throw new SemanticException();
+                                }
+
+                                endReg = lastReg;
+
+                                builder.Append($"{_directives[returnStatement.ReturnKeyword.Kind]} {_predefinedTypes[(method.ReturnType as PredefinedTypeSyntax).Keyword.Kind]} %r{endReg}");
+                                builder.Append(_delimiters[returnStatement.SemicolonToken.Kind]);
+                            }
+                            else if ((method.ReturnType as PredefinedTypeSyntax).Keyword.Kind is SyntaxKind.VoidKeyword)
+                            {
+                                if (returnStatement.Expression is not null)
+                                {
+                                    throw new SemanticException();
+                                }
+
+                                endReg = lastReg = startReg - 1;
+
+                                builder.Append($"{_directives[returnStatement.ReturnKeyword.Kind]} {_predefinedTypes[(method.ReturnType as PredefinedTypeSyntax).Keyword.Kind]}");
+                                builder.Append(_delimiters[returnStatement.SemicolonToken.Kind]);
+                            }
+                            else
                             {
                                 throw new SemanticException();
                             }
-
-                            endReg = lastReg;
-
-                            builder.Append($"{_directives[returnStatement.ReturnKeyword.Kind]} {_predefinedTypes[SyntaxKind.IntKeyword]} %r{endReg}");
-                            builder.Append(_delimiters[returnStatement.SemicolonToken.Kind]);
                         }
 
                         break;
@@ -690,7 +810,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                                 builder.Append($"r{beforeEndReg + 2}:");
                                 builder.AppendLine();
 
-                                RealizeStatement(ifStatement.Statement, scope, loopStartTag, loopEndTag, (int)beforeEndReg + 5, out _, out lastReg);
+                                RealizeStatement(ifStatement.Statement, scope, method, loopStartTag, loopEndTag, (int)beforeEndReg + 5, out _, out lastReg);
 
                                 builder.Append($"br label %r{beforeEndReg + 3}");
                                 builder.AppendLine();
@@ -710,7 +830,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                                 builder.Append($"r{beforeEndReg + 2}:");
                                 builder.AppendLine();
 
-                                RealizeStatement(ifStatement.Statement, scope, loopStartTag, loopEndTag, (int)beforeEndReg + 6, out _, out int middleReg);
+                                RealizeStatement(ifStatement.Statement, scope, method, loopStartTag, loopEndTag, (int)beforeEndReg + 6, out _, out int middleReg);
 
                                 builder.Append($"br label %r{beforeEndReg + 4}");
                                 builder.AppendLine();
@@ -718,7 +838,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                                 builder.Append($"r{beforeEndReg + 3}:");
                                 builder.AppendLine();
 
-                                RealizeStatement(ifStatement.Else.Statement, scope, loopStartTag, loopEndTag, middleReg + 1, out _, out lastReg);
+                                RealizeStatement(ifStatement.Else.Statement, scope, method, loopStartTag, loopEndTag, middleReg + 1, out _, out lastReg);
 
                                 builder.Append($"br label %r{beforeEndReg + 4}");
                                 builder.AppendLine();
@@ -740,7 +860,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
 
                             var nextScope = new MemberScope(scope);
 
-                            RealizeStatements(block.Statements, nextScope, loopStartTag, loopEndTag, startReg, out endReg, out lastReg);
+                            RealizeStatements(block.Statements, nextScope, method, loopStartTag, loopEndTag, startReg, out endReg, out lastReg);
 
                             endReg = lastReg;
                         }
@@ -770,7 +890,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                             builder.Append($"r{beforeEndReg + 2}:");
                             builder.AppendLine();
 
-                            RealizeStatement(whileStatement.Statement, scope, $"%r{startReg}", $"%r{beforeEndReg + 3}", (int)beforeEndReg + 5, out _, out lastReg);
+                            RealizeStatement(whileStatement.Statement, scope, method, $"%r{startReg}", $"%r{beforeEndReg + 3}", (int)beforeEndReg + 5, out _, out lastReg);
 
                             builder.Append($"br label %r{startReg}");
                             builder.AppendLine();
@@ -824,11 +944,11 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                 }
             }
 
-            void RealizeStatements(IReadOnlyList<StatementSyntax> statements, MemberScope scope, string loopStartTag, string loopEndTag, int startReg, out int? endReg, out int lastReg)
+            void RealizeStatements(IReadOnlyList<StatementSyntax> statements, MemberScope scope, MethodDeclarationSyntax method, string loopStartTag, string loopEndTag, int startReg, out int? endReg, out int lastReg)
             {
                 foreach (var statement in statements)
                 {
-                    RealizeStatement(statement, scope, loopStartTag, loopEndTag, startReg, out _, out int tempLastReg);
+                    RealizeStatement(statement, scope, method, loopStartTag, loopEndTag, startReg, out _, out int tempLastReg);
                     startReg = tempLastReg + 1;
                 }
 
@@ -871,7 +991,11 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                         if (scope.TryLookup(($"{identifierName.Identifier.Value}", VARIABLE), out var value) &&
                             !HasConst(value.Node))
                         {
-                            var baseType = (value.Node.Kind is SyntaxKind.LocalDeclarationStatement ? (value.Node as LocalDeclarationStatementSyntax).Declaration.Type : (value.Node as FieldDeclarationSyntax).Declaration.Type);
+                            var baseType = (value.Node.Kind is SyntaxKind.LocalDeclarationStatement ?
+                                        (value.Node as LocalDeclarationStatementSyntax).Declaration.Type :
+                                        (value.Node.Kind is SyntaxKind.FieldDeclaration ?
+                                        (value.Node as FieldDeclarationSyntax).Declaration.Type :
+                                        (value.Node as ParameterSyntax).Type));
                             int[] ranks = value.Properties[RANKS] as int[];
 
                             if (elementAccessExpression.Arguments.Count != ranks.Length)
@@ -890,9 +1014,34 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
 
                             string arrayName = value.ActualName;
 
-                            for (int i = 0; i < elementAccessExpression.Arguments.Count; i++)
+                            if (value.Node.Kind is SyntaxKind.LocalDeclarationStatement or SyntaxKind.FieldDeclaration)
                             {
-                                var argument = elementAccessExpression.Arguments[i];
+                                for (int i = 0; i < elementAccessExpression.Arguments.Count; i++)
+                                {
+                                    var argument = elementAccessExpression.Arguments[i];
+
+                                    RealizeExpressionExcludeAssignment(argument.Argument.Expression, scope, false, startReg, out int? tempEndReg, out _);
+
+                                    if (tempEndReg is null)
+                                    {
+                                        throw new SemanticException();
+                                    }
+
+                                    builder.Append($"%r{tempEndReg + 1} = getelementptr");
+                                    builder.Append(" ");
+                                    RealizeLocalDeclarationArrayType(ranks, scope, baseType, i);
+                                    builder.Append(", ");
+                                    RealizeLocalDeclarationArrayType(ranks, scope, baseType, i);
+                                    builder.Append($"* {arrayName}, {_predefinedTypes[SyntaxKind.IntKeyword]} 0, {_predefinedTypes[SyntaxKind.IntKeyword]} %r{tempEndReg}");
+                                    builder.AppendLine();
+
+                                    arrayName = $"%r{tempEndReg + 1}";
+                                    startReg = (int)tempEndReg + 2;
+                                }
+                            }
+                            else
+                            {
+                                var argument = elementAccessExpression.Arguments[0];
 
                                 RealizeExpressionExcludeAssignment(argument.Argument.Expression, scope, false, startReg, out int? tempEndReg, out _);
 
@@ -903,14 +1052,37 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
 
                                 builder.Append($"%r{tempEndReg + 1} = getelementptr");
                                 builder.Append(" ");
-                                RealizeLocalDeclarationArrayType(ranks, scope, baseType, i);
+                                RealizeLocalDeclarationArrayType(ranks, scope, baseType, 1);
                                 builder.Append(", ");
-                                RealizeLocalDeclarationArrayType(ranks, scope, baseType, i);
-                                builder.Append($"* {arrayName}, {_predefinedTypes[SyntaxKind.IntKeyword]} 0, {_predefinedTypes[SyntaxKind.IntKeyword]} %r{tempEndReg}");
+                                RealizeLocalDeclarationArrayType(ranks, scope, baseType, 1);
+                                builder.Append($"* {arrayName}, {_predefinedTypes[SyntaxKind.IntKeyword]} %r{tempEndReg}");
                                 builder.AppendLine();
 
                                 arrayName = $"%r{tempEndReg + 1}";
                                 startReg = (int)tempEndReg + 2;
+
+                                for (int i = 1; i < elementAccessExpression.Arguments.Count; i++)
+                                {
+                                    argument = elementAccessExpression.Arguments[i];
+
+                                    RealizeExpressionExcludeAssignment(argument.Argument.Expression, scope, false, startReg, out int? tempEndReg1, out _);
+
+                                    if (tempEndReg1 is null)
+                                    {
+                                        throw new SemanticException();
+                                    }
+
+                                    builder.Append($"%r{tempEndReg1 + 1} = getelementptr");
+                                    builder.Append(" ");
+                                    RealizeLocalDeclarationArrayType(ranks, scope, baseType, i);
+                                    builder.Append(", ");
+                                    RealizeLocalDeclarationArrayType(ranks, scope, baseType, i);
+                                    builder.Append($"* {arrayName}, {_predefinedTypes[SyntaxKind.IntKeyword]} 0, {_predefinedTypes[SyntaxKind.IntKeyword]} %r{tempEndReg1}");
+                                    builder.AppendLine();
+
+                                    arrayName = $"%r{tempEndReg1 + 1}";
+                                    startReg = (int)tempEndReg1 + 2;
+                                }
                             }
 
                             builder.Append($"{_directives[expression.Kind]} {_predefinedTypes[SyntaxKind.IntKeyword]} %r{beforeEndReg}, {_predefinedTypes[SyntaxKind.IntKeyword]}* {arrayName}");
@@ -1008,7 +1180,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                                     throw new SemanticException();
                                 }
 
-                                RealizeArgumentList(invocationExpression.ArgumentList, scope, startReg, out int? beforeEndReg, out _, out string[] arguments);
+                                RealizeArgumentList(invocationExpression.ArgumentList, scope, methodDeclaration.ParameterList, startReg, out int? beforeEndReg, out _, out string[] arguments);
 
                                 if (methodDeclaration.ReturnType is PredefinedTypeSyntax predefinedType &&
                                     predefinedType.Keyword.Kind is SyntaxKind.VoidKeyword)
@@ -1101,7 +1273,11 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
 
                             if (scope.TryLookup(($"{identifierName.Identifier.Value}", VARIABLE), out var value))
                             {
-                                var baseType = (value.Node.Kind is SyntaxKind.LocalDeclarationStatement ? (value.Node as LocalDeclarationStatementSyntax).Declaration.Type : (value.Node as FieldDeclarationSyntax).Declaration.Type);
+                                var baseType = (value.Node.Kind is SyntaxKind.LocalDeclarationStatement ?
+                                        (value.Node as LocalDeclarationStatementSyntax).Declaration.Type :
+                                        (value.Node.Kind is SyntaxKind.FieldDeclaration ?
+                                        (value.Node as FieldDeclarationSyntax).Declaration.Type :
+                                        (value.Node as ParameterSyntax).Type));
                                 int[] ranks = value.Properties[RANKS] as int[];
 
                                 if (elementAccessExpression.Arguments.Count != ranks.Length)
@@ -1111,9 +1287,34 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
 
                                 string arrayName = value.ActualName;
 
-                                for (int i = 0; i < elementAccessExpression.Arguments.Count; i++)
+                                if (value.Node.Kind is SyntaxKind.LocalDeclarationStatement or SyntaxKind.FieldDeclaration)
                                 {
-                                    var argument = elementAccessExpression.Arguments[i];
+                                    for (int i = 0; i < elementAccessExpression.Arguments.Count; i++)
+                                    {
+                                        var argument = elementAccessExpression.Arguments[i];
+
+                                        RealizeExpressionExcludeAssignment(argument.Argument.Expression, scope, mustConst, startReg, out int? tempEndReg, out _);
+
+                                        if (tempEndReg is null)
+                                        {
+                                            throw new SemanticException();
+                                        }
+
+                                        builder.Append($"%r{tempEndReg + 1} = getelementptr");
+                                        builder.Append(" ");
+                                        RealizeLocalDeclarationArrayType(ranks, scope, baseType, i);
+                                        builder.Append(", ");
+                                        RealizeLocalDeclarationArrayType(ranks, scope, baseType, i);
+                                        builder.Append($"* {arrayName}, {_predefinedTypes[SyntaxKind.IntKeyword]} 0, {_predefinedTypes[SyntaxKind.IntKeyword]} %r{tempEndReg}");
+                                        builder.AppendLine();
+
+                                        arrayName = $"%r{tempEndReg + 1}";
+                                        startReg = (int)tempEndReg + 2;
+                                    }
+                                }
+                                else
+                                {
+                                    var argument = elementAccessExpression.Arguments[0];
 
                                     RealizeExpressionExcludeAssignment(argument.Argument.Expression, scope, mustConst, startReg, out int? tempEndReg, out _);
 
@@ -1124,14 +1325,37 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
 
                                     builder.Append($"%r{tempEndReg + 1} = getelementptr");
                                     builder.Append(" ");
-                                    RealizeLocalDeclarationArrayType(ranks, scope, baseType, i);
+                                    RealizeLocalDeclarationArrayType(ranks, scope, baseType, 1);
                                     builder.Append(", ");
-                                    RealizeLocalDeclarationArrayType(ranks, scope, baseType, i);
-                                    builder.Append($"* {arrayName}, {_predefinedTypes[SyntaxKind.IntKeyword]} 0, {_predefinedTypes[SyntaxKind.IntKeyword]} %r{tempEndReg}");
+                                    RealizeLocalDeclarationArrayType(ranks, scope, baseType, 1);
+                                    builder.Append($"* {arrayName}, {_predefinedTypes[SyntaxKind.IntKeyword]} %r{tempEndReg}");
                                     builder.AppendLine();
 
                                     arrayName = $"%r{tempEndReg + 1}";
                                     startReg = (int)tempEndReg + 2;
+
+                                    for (int i = 1; i < elementAccessExpression.Arguments.Count; i++)
+                                    {
+                                        argument = elementAccessExpression.Arguments[i];
+
+                                        RealizeExpressionExcludeAssignment(argument.Argument.Expression, scope, mustConst, startReg, out int? tempEndReg1, out _);
+
+                                        if (tempEndReg1 is null)
+                                        {
+                                            throw new SemanticException();
+                                        }
+
+                                        builder.Append($"%r{tempEndReg1 + 1} = getelementptr");
+                                        builder.Append(" ");
+                                        RealizeLocalDeclarationArrayType(ranks, scope, baseType, i);
+                                        builder.Append(", ");
+                                        RealizeLocalDeclarationArrayType(ranks, scope, baseType, i);
+                                        builder.Append($"* {arrayName}, {_predefinedTypes[SyntaxKind.IntKeyword]} 0, {_predefinedTypes[SyntaxKind.IntKeyword]} %r{tempEndReg1}");
+                                        builder.AppendLine();
+
+                                        arrayName = $"%r{tempEndReg1 + 1}";
+                                        startReg = (int)tempEndReg1 + 2;
+                                    }
                                 }
 
                                 builder.Append($"%r{startReg} = {_directives[expression.Kind]} {_predefinedTypes[SyntaxKind.IntKeyword]}, {_predefinedTypes[SyntaxKind.IntKeyword]}* {arrayName}");
@@ -1233,29 +1457,236 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                 }
             }
 
-            void RealizeArgumentList(ArgumentListSyntax argumentList, MemberScope scope, int startReg, out int? endReg, out int lastReg, out string[] arguments)
+            void RealizeArgumentList(ArgumentListSyntax argumentList, MemberScope scope, ParameterListSyntax parameterList, int startReg, out int? endReg, out int lastReg, out string[] arguments)
             {
                 var args = new string[argumentList.Arguments.Count];
 
                 for (int i = 0; i < argumentList.Arguments.Count; i++)
                 {
                     var argument = argumentList.Arguments[i];
+                    var parameter = parameterList.Parameters[i];
 
-                    RealizeExpressionExcludeAssignment(argument.Expression, scope, false, startReg, out int? tempEndReg, out _);
-
-                    if (tempEndReg is null)
+                    if (parameter.RankSpecifiers?.Any() ?? false)
                     {
-                        throw new SemanticException();
+                        if (argument.Expression.Kind is SyntaxKind.ElementAccessExpression)
+                        {
+                            var elementAccessExpression = argument.Expression as ElementAccessExpressionSyntax;
+                            var identifierName = elementAccessExpression.Expression as IdentifierNameSyntax;
+
+                            if (scope.TryLookup(($"{identifierName.Identifier.Value}", VARIABLE), out var value))
+                            {
+                                var baseType = (value.Node.Kind is SyntaxKind.LocalDeclarationStatement ?
+                                        (value.Node as LocalDeclarationStatementSyntax).Declaration.Type :
+                                        (value.Node.Kind is SyntaxKind.FieldDeclaration ?
+                                        (value.Node as FieldDeclarationSyntax).Declaration.Type :
+                                        (value.Node as ParameterSyntax).Type));
+                                int[] ranks = value.Properties[RANKS] as int[];
+
+                                if (elementAccessExpression.Arguments.Count + parameter.RankSpecifiers.Count != ranks.Length)
+                                {
+                                    throw new SemanticException();
+                                }
+
+                                string arrayName = value.ActualName;
+
+                                if (value.Node.Kind is SyntaxKind.LocalDeclarationStatement or SyntaxKind.FieldDeclaration)
+                                {
+                                    for (int j = 0; j < elementAccessExpression.Arguments.Count; j++)
+                                    {
+                                        var argument1 = elementAccessExpression.Arguments[j];
+
+                                        RealizeExpressionExcludeAssignment(argument1.Argument.Expression, scope, false, startReg, out int? tempEndReg, out _);
+
+                                        if (tempEndReg is null)
+                                        {
+                                            throw new SemanticException();
+                                        }
+
+                                        builder.Append($"%r{tempEndReg + 1} = getelementptr");
+                                        builder.Append(" ");
+                                        RealizeLocalDeclarationArrayType(ranks, scope, baseType, j);
+                                        builder.Append(", ");
+                                        RealizeLocalDeclarationArrayType(ranks, scope, baseType, j);
+                                        builder.Append($"* {arrayName}, {_predefinedTypes[SyntaxKind.IntKeyword]} 0, {_predefinedTypes[SyntaxKind.IntKeyword]} %r{tempEndReg}");
+                                        builder.AppendLine();
+
+                                        arrayName = $"%r{tempEndReg + 1}";
+                                        startReg = (int)tempEndReg + 2;
+                                    }
+
+                                    builder.Append($"%r{startReg} = getelementptr");
+                                    builder.Append(" ");
+                                    RealizeLocalDeclarationArrayType(ranks, scope, baseType, elementAccessExpression.Arguments.Count);
+                                    builder.Append(", ");
+                                    RealizeLocalDeclarationArrayType(ranks, scope, baseType, elementAccessExpression.Arguments.Count);
+                                    builder.Append($"* {arrayName}, {_predefinedTypes[SyntaxKind.IntKeyword]} 0, {_predefinedTypes[SyntaxKind.IntKeyword]} 0");
+                                    builder.AppendLine();
+
+                                    arrayName = $"%r{startReg}";
+                                    startReg++;
+                                }
+                                else
+                                {
+                                    var argument1 = elementAccessExpression.Arguments[0];
+
+                                    RealizeExpressionExcludeAssignment(argument1.Argument.Expression, scope, false, startReg, out int? tempEndReg, out _);
+
+                                    if (tempEndReg is null)
+                                    {
+                                        throw new SemanticException();
+                                    }
+
+                                    builder.Append($"%r{tempEndReg + 1} = getelementptr");
+                                    builder.Append(" ");
+                                    RealizeLocalDeclarationArrayType(ranks, scope, baseType, 1);
+                                    builder.Append(", ");
+                                    RealizeLocalDeclarationArrayType(ranks, scope, baseType, 1);
+                                    builder.Append($"* {arrayName}, {_predefinedTypes[SyntaxKind.IntKeyword]} %r{tempEndReg}");
+                                    builder.AppendLine();
+
+                                    arrayName = $"%r{tempEndReg + 1}";
+                                    startReg = (int)tempEndReg + 2;
+
+                                    if (elementAccessExpression.Arguments.Count > 1)
+                                    {
+                                        for (int j = 1; j < elementAccessExpression.Arguments.Count; j++)
+                                        {
+                                            argument1 = elementAccessExpression.Arguments[j];
+
+                                            RealizeExpressionExcludeAssignment(argument1.Argument.Expression, scope, false, startReg, out int? tempEndReg1, out _);
+
+                                            if (tempEndReg1 is null)
+                                            {
+                                                throw new SemanticException();
+                                            }
+
+                                            builder.Append($"%r{tempEndReg1 + 1} = getelementptr");
+                                            builder.Append(" ");
+                                            RealizeLocalDeclarationArrayType(ranks, scope, baseType, j);
+                                            builder.Append(", ");
+                                            RealizeLocalDeclarationArrayType(ranks, scope, baseType, j);
+                                            builder.Append($"* {arrayName}, {_predefinedTypes[SyntaxKind.IntKeyword]} 0, {_predefinedTypes[SyntaxKind.IntKeyword]} %r{tempEndReg1}");
+                                            builder.AppendLine();
+
+                                            arrayName = $"%r{tempEndReg1 + 1}";
+                                            startReg = (int)tempEndReg1 + 2;
+                                        }
+
+                                        builder.Append($"%r{startReg} = getelementptr");
+                                        builder.Append(" ");
+                                        RealizeLocalDeclarationArrayType(ranks, scope, baseType, elementAccessExpression.Arguments.Count);
+                                        builder.Append(", ");
+                                        RealizeLocalDeclarationArrayType(ranks, scope, baseType, elementAccessExpression.Arguments.Count);
+                                        builder.Append($"* {arrayName}, {_predefinedTypes[SyntaxKind.IntKeyword]} 0, {_predefinedTypes[SyntaxKind.IntKeyword]} 0");
+                                        builder.AppendLine();
+
+                                        arrayName = $"%r{startReg}";
+                                        startReg++;
+                                    }
+                                }
+
+                                args[i] = $"{GenerateParameterArrayType(ranks, scope, baseType, elementAccessExpression.Arguments.Count)} {arrayName}";
+                            }
+                            else
+                            {
+                                throw new SemanticException();
+                            }
+                        }
+                        else
+                        {
+                            var identifierName = argument.Expression as IdentifierNameSyntax;
+
+                            if (scope.TryLookup(($"{identifierName.Identifier.Value}", VARIABLE), out var value))
+                            {
+                                var baseType = (value.Node.Kind is SyntaxKind.LocalDeclarationStatement ?
+                                        (value.Node as LocalDeclarationStatementSyntax).Declaration.Type :
+                                        (value.Node.Kind is SyntaxKind.FieldDeclaration ?
+                                        (value.Node as FieldDeclarationSyntax).Declaration.Type :
+                                        (value.Node as ParameterSyntax).Type));
+                                int[] ranks = value.Properties[RANKS] as int[];
+
+                                if (parameter.RankSpecifiers.Count != ranks.Length)
+                                {
+                                    throw new SemanticException();
+                                }
+
+                                string arrayName = value.ActualName;
+
+                                if (value.Node.Kind is SyntaxKind.LocalDeclarationStatement or SyntaxKind.FieldDeclaration)
+                                {
+                                    builder.Append($"%r{startReg} = getelementptr");
+                                    builder.Append(" ");
+                                    RealizeLocalDeclarationArrayType(ranks, scope, baseType, 0);
+                                    builder.Append(", ");
+                                    RealizeLocalDeclarationArrayType(ranks, scope, baseType, 0);
+                                    builder.Append($"* {arrayName}, {_predefinedTypes[SyntaxKind.IntKeyword]} 0, {_predefinedTypes[SyntaxKind.IntKeyword]} 0");
+                                    builder.AppendLine();
+
+                                    arrayName = $"%r{startReg}";
+                                    startReg++;
+                                }
+
+                                args[i] = $"{GenerateParameterArrayType(ranks, scope, baseType, 0)} {arrayName}";
+                            }
+                            else
+                            {
+                                throw new SemanticException();
+                            }
+                        }
                     }
+                    else
+                    {
+                        RealizeExpressionExcludeAssignment(argument.Expression, scope, false, startReg, out int? tempEndReg, out _);
 
-                    args[i] = $"{_predefinedTypes[SyntaxKind.IntKeyword]} %r{tempEndReg}";
+                        if (tempEndReg is null)
+                        {
+                            throw new SemanticException();
+                        }
 
-                    startReg = (int)tempEndReg + 1;
+                        args[i] = $"{_predefinedTypes[SyntaxKind.IntKeyword]} %r{tempEndReg}";
+
+                        startReg = (int)tempEndReg + 1;
+                    }
                 }
 
                 endReg = lastReg = startReg - 1;
 
                 arguments = args;
+            }
+
+            string GenerateParameterArrayType(int[] ranks, MemberScope scope, TypeSyntax baseType, int index)
+            {
+                return $"{GenerateParameterArrayTypeCore(ranks, scope, baseType, index + 1)}*";
+            }
+
+            string GenerateParameterArrayTypeCore(int[] ranks, MemberScope scope, TypeSyntax baseType, int index)
+            {
+                if (index >= ranks.Length)
+                {
+                    return GenerateType(baseType, scope);
+                }
+
+                int rank = ranks[index];
+
+                return $"[{rank} x {GenerateParameterArrayType(ranks, scope, baseType, index + 1)}]";
+            }
+
+            string GenerateType(TypeSyntax type, MemberScope scope)
+            {
+                switch (type.Kind)
+                {
+                    case SyntaxKind.PredefinedType:
+                        if (_predefinedTypes.TryGetValue((type as PredefinedTypeSyntax).Keyword.Kind, out var typeCode))
+                        {
+                            return typeCode;
+                        }
+
+                        break;
+                    default:
+                        break;
+                }
+
+                return string.Empty;
             }
 
             int CalculateExpressionExcludeAssignment(ExpressionSyntax expression, MemberScope scope)
@@ -1441,6 +1872,8 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
             { SyntaxKind.GreaterThanExpression, "icmp sgt" },
             { SyntaxKind.GreaterThanOrEqualExpression, "icmp sge" }
         };
+
+        private const string MAIN = "main";
 
         private const string METHOD = "method";
         private const string VARIABLE = "variable";

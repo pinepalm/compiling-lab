@@ -15,5 +15,7 @@ namespace BUAA.CodeAnalysis.MiniSysY
         public override TypeSyntax Type { get; init; }
 
         public SyntaxToken? Identifier { get; init; }
+
+        public IReadOnlyList<ArrayRankSpecifierSyntax> RankSpecifiers { get; init; }
     }
 }

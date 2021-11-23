@@ -10,10 +10,17 @@ namespace BUAA.CodeAnalysis.MiniSysY
 
 #if DEBUG
         private const string TestMiniSysYCodeText =
-@"int arr[2][2] = {{1, 1}, {4, 5}};
+@"int func1() {
+    return 555;
+}
+
+int func2() {
+    return 111;
+}
+
 int main() {
-    arr[1] = 2;
-    putint(arr[1][0]);
+    int a = func1();
+    putint(a - func2());
     return 0;
 }";
 #endif

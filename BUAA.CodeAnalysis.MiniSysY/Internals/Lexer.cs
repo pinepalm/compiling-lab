@@ -382,6 +382,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
         private static readonly Dictionary<string, SyntaxKind> _keywords = new()
         {
             { "int", SyntaxKind.IntKeyword },
+            { "void", SyntaxKind.VoidKeyword },
             { "return", SyntaxKind.ReturnKeyword },
             { "const", SyntaxKind.ConstKeyword },
             { "if", SyntaxKind.IfKeyword },
