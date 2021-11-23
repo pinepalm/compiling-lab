@@ -104,7 +104,8 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                                 ActualName = $"@{identifier.Value}",
                                 Kind = VARIABLE,
                                 Node = field
-                            }.WithProperty(RANKS, ranks));
+                            }.WithProperty(RANKS, ranks)
+                            .WithProperty(UNIT_ACTUAL_NAME, $"@{identifier.Value}"));
                         }
                         else
                         {
@@ -113,13 +114,13 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                             builder.Append($"@{identifier.Value} = dso_local global {_predefinedTypes[SyntaxKind.IntKeyword]} {value}");
                             builder.AppendLine();
 
-                            scope.Members.Add(($"{identifier.Value}", VARIABLE), new()
+                            scope.Members.Add(($"{identifier.Value}", VARIABLE), new MemberInfo()
                             {
                                 Name = $"{identifier.Value}",
                                 ActualName = $"@{identifier.Value}",
                                 Kind = VARIABLE,
                                 Node = field
-                            });
+                            }.WithProperty(UNIT_ACTUAL_NAME, $"@{identifier.Value}"));
                         }
                     }
                 }
@@ -233,13 +234,13 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                     {
                         builder.Append($"@{method.Identifier.Value}");
 
-                        scope.Members.Add(($"{method.Identifier.Value}", METHOD), new()
+                        scope.Members.Add(($"{method.Identifier.Value}", METHOD), new MemberInfo()
                         {
                             Name = $"{method.Identifier.Value}",
                             ActualName = $"@{method.Identifier.Value}",
                             Kind = METHOD,
                             Node = method
-                        });
+                        }.WithProperty(UNIT_ACTUAL_NAME, $"@{method.Identifier.Value}"));
                     }
 
                     var nextScope = new MemberScope(scope);
@@ -264,13 +265,13 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                     {
                         builder.Append($"@{method.Identifier.Value}");
 
-                        scope.Members.Add(($"{method.Identifier.Value}", METHOD), new()
+                        scope.Members.Add(($"{method.Identifier.Value}", METHOD), new MemberInfo()
                         {
                             Name = $"{method.Identifier.Value}",
                             ActualName = $"@{method.Identifier.Value}",
                             Kind = METHOD,
                             Node = method
-                        });
+                        }.WithProperty(UNIT_ACTUAL_NAME, $"@{method.Identifier.Value}"));
                     }
 
                     var nextScope = new MemberScope(scope);
@@ -380,7 +381,8 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                                     ActualName = $"%r{i}",
                                     Kind = VARIABLE,
                                     Node = parameter
-                                }.WithProperty(RANKS, ranks));
+                                }.WithProperty(RANKS, ranks)
+                                .WithProperty(UNIT_ACTUAL_NAME, $"%r{i}"));
                             }
                         }
                     }
@@ -401,13 +403,13 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                                 builder.Append(" ");
                                 builder.Append($"%r{i}");
 
-                                scope.Members.Add(($"{identifier.Value}", VARIABLE), new()
+                                scope.Members.Add(($"{identifier.Value}", VARIABLE), new MemberInfo()
                                 {
                                     Name = $"{identifier.Value}",
                                     ActualName = $"%r{i}",
                                     Kind = VARIABLE,
                                     Node = parameter
-                                });
+                                }.WithProperty(UNIT_ACTUAL_NAME, $"%r{i}"));
                             }
                         }
                     }
@@ -425,6 +427,36 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
             {
                 builder.Append(_delimiters[body.OpenBraceToken.Kind]);
                 builder.AppendLine();
+
+                foreach (var parameter in method.ParameterList.Parameters)
+                {
+                    var identifier = (SyntaxToken)(parameter.Identifier);
+                    var value = scope.Members[($"{identifier.Value}", VARIABLE)];
+
+                    if (parameter.RankSpecifiers?.Any() ?? false)
+                    {
+                        int[] ranks = value.Properties[RANKS] as int[];
+
+                        builder.Append($"%r{startReg} = {_directives[SyntaxKind.VariableDeclarator]} {GenerateParameterArrayType(ranks, scope, parameter.Type, 0)}");
+                        builder.AppendLine();
+                        builder.Append($"{_directives[SyntaxKind.EqualsValueClause]} {GenerateParameterArrayType(ranks, scope, parameter.Type, 0)} {value.Properties[UNIT_ACTUAL_NAME]}, {GenerateParameterArrayType(ranks, scope, parameter.Type, 0)} * %r{startReg}");
+                        builder.AppendLine();
+
+                        value.Properties[UNIT_ACTUAL_NAME] = $"%r{startReg}";
+                        startReg++;
+                    }
+                    else
+                    {
+                        builder.Append($"%r{startReg} = {_directives[SyntaxKind.VariableDeclarator]} {GenerateType(parameter.Type, scope)}");
+                        builder.AppendLine();
+                        builder.Append($"{_directives[SyntaxKind.EqualsValueClause]} {GenerateType(parameter.Type, scope)} {value.Properties[UNIT_ACTUAL_NAME]}, {GenerateType(parameter.Type, scope)}* %r{startReg}");
+                        builder.AppendLine();
+
+                        value.Properties[UNIT_ACTUAL_NAME] = $"%r{startReg}";
+                        startReg++;
+                    }
+                }
+
                 RealizeStatements(body.Statements, scope, method, null, null, startReg, out _, out _);
 
                 if ((method.ReturnType as PredefinedTypeSyntax).Keyword.Kind is SyntaxKind.VoidKeyword)
@@ -703,7 +735,8 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                                             ActualName = $"%r{startReg}",
                                             Kind = VARIABLE,
                                             Node = localDeclarationStatement
-                                        }.WithProperty(RANKS, ranks));
+                                        }.WithProperty(RANKS, ranks)
+                                        .WithProperty(UNIT_ACTUAL_NAME, $"%r{startReg}"));
                                         startReg++;
 
                                         if (scope.TryLookup(($"{identifier.Value}", VARIABLE), out var value))
@@ -712,7 +745,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                                             {
                                                 bool mustConst = HasConst(value.Node);
 
-                                                RealizeLocalDeclarationArrayInitializer(variable.Initializer.Value, scope, variableDeclaration.Type, ranks, value.ActualName, mustConst, startReg, out int? tempEndReg, out _);
+                                                RealizeLocalDeclarationArrayInitializer(variable.Initializer.Value, scope, variableDeclaration.Type, ranks, value.Properties[UNIT_ACTUAL_NAME] as string, mustConst, startReg, out int? tempEndReg, out _);
                                                 startReg = (int)tempEndReg + 1;
                                             }
                                         }
@@ -726,13 +759,13 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                                         builder.Append($"%r{startReg} = {_directives[variable.Kind]} {_predefinedTypes[SyntaxKind.IntKeyword]}");
                                         builder.AppendLine();
 
-                                        scope.Members.Add(($"{identifier.Value}", VARIABLE), new()
+                                        scope.Members.Add(($"{identifier.Value}", VARIABLE), new MemberInfo()
                                         {
                                             Name = $"{identifier.Value}",
                                             ActualName = $"%r{startReg}",
                                             Kind = VARIABLE,
                                             Node = localDeclarationStatement
-                                        });
+                                        }.WithProperty(UNIT_ACTUAL_NAME, $"%r{startReg}"));
                                         startReg++;
 
                                         if (scope.TryLookup(($"{identifier.Value}", VARIABLE), out var value))
@@ -748,7 +781,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                                                     throw new SemanticException();
                                                 }
 
-                                                builder.Append($"{_directives[variable.Initializer.Kind]} {_predefinedTypes[SyntaxKind.IntKeyword]} %r{tempEndReg}, {_predefinedTypes[SyntaxKind.IntKeyword]}* {value.ActualName}");
+                                                builder.Append($"{_directives[variable.Initializer.Kind]} {_predefinedTypes[SyntaxKind.IntKeyword]} %r{tempEndReg}, {_predefinedTypes[SyntaxKind.IntKeyword]}* {value.Properties[UNIT_ACTUAL_NAME]}");
                                                 builder.AppendLine();
 
                                                 startReg = (int)tempEndReg + 1;
@@ -975,7 +1008,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                                 throw new SemanticException();
                             }
 
-                            builder.Append($"{_directives[expression.Kind]} {_predefinedTypes[SyntaxKind.IntKeyword]} %r{endReg}, {_predefinedTypes[SyntaxKind.IntKeyword]}* {value.ActualName}");
+                            builder.Append($"{_directives[expression.Kind]} {_predefinedTypes[SyntaxKind.IntKeyword]} %r{endReg}, {_predefinedTypes[SyntaxKind.IntKeyword]}* {value.Properties[UNIT_ACTUAL_NAME]}");
                             builder.AppendLine();
                         }
                         else
@@ -1012,7 +1045,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
 
                             startReg = (int)beforeEndReg + 1;
 
-                            string arrayName = value.ActualName;
+                            string arrayName = value.Properties[UNIT_ACTUAL_NAME] as string;
 
                             if (value.Node.Kind is SyntaxKind.LocalDeclarationStatement or SyntaxKind.FieldDeclaration)
                             {
@@ -1185,7 +1218,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                                 if (methodDeclaration.ReturnType is PredefinedTypeSyntax predefinedType &&
                                     predefinedType.Keyword.Kind is SyntaxKind.VoidKeyword)
                                 {
-                                    builder.Append($"{_directives[expression.Kind]} {_predefinedTypes[SyntaxKind.VoidKeyword]} {value.ActualName}");
+                                    builder.Append($"{_directives[expression.Kind]} {_predefinedTypes[SyntaxKind.VoidKeyword]} {value.Properties[UNIT_ACTUAL_NAME]}");
                                     builder.Append($"{_delimiters[invocationExpression.ArgumentList.OpenParenToken.Kind]}");
 
                                     for (int i = 0; i < arguments.Length; i++)
@@ -1207,7 +1240,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                                 }
                                 else
                                 {
-                                    builder.Append($"%r{beforeEndReg + 1} = {_directives[expression.Kind]} {_predefinedTypes[SyntaxKind.IntKeyword]} {value.ActualName}");
+                                    builder.Append($"%r{beforeEndReg + 1} = {_directives[expression.Kind]} {_predefinedTypes[SyntaxKind.IntKeyword]} {value.Properties[UNIT_ACTUAL_NAME]}");
                                     builder.Append($"{_delimiters[invocationExpression.ArgumentList.OpenParenToken.Kind]}");
 
                                     for (int i = 0; i < arguments.Length; i++)
@@ -1249,7 +1282,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                                     }
                                 }
 
-                                builder.Append($"%r{startReg} = {_directives[expression.Kind]} {_predefinedTypes[SyntaxKind.IntKeyword]}, {_predefinedTypes[SyntaxKind.IntKeyword]}* {value.ActualName}");
+                                builder.Append($"%r{startReg} = {_directives[expression.Kind]} {_predefinedTypes[SyntaxKind.IntKeyword]}, {_predefinedTypes[SyntaxKind.IntKeyword]}* {value.Properties[UNIT_ACTUAL_NAME]}");
                                 builder.AppendLine();
 
                                 endReg = lastReg = startReg;
@@ -1285,7 +1318,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                                     throw new SemanticException();
                                 }
 
-                                string arrayName = value.ActualName;
+                                string arrayName = value.Properties[UNIT_ACTUAL_NAME] as string;
 
                                 if (value.Node.Kind is SyntaxKind.LocalDeclarationStatement or SyntaxKind.FieldDeclaration)
                                 {
@@ -1487,7 +1520,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                                     throw new SemanticException();
                                 }
 
-                                string arrayName = value.ActualName;
+                                string arrayName = value.Properties[UNIT_ACTUAL_NAME] as string;
 
                                 if (value.Node.Kind is SyntaxKind.LocalDeclarationStatement or SyntaxKind.FieldDeclaration)
                                 {
@@ -1610,7 +1643,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                                     throw new SemanticException();
                                 }
 
-                                string arrayName = value.ActualName;
+                                string arrayName = value.Properties[UNIT_ACTUAL_NAME] as string;
 
                                 if (value.Node.Kind is SyntaxKind.LocalDeclarationStatement or SyntaxKind.FieldDeclaration)
                                 {
@@ -1879,5 +1912,6 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
         private const string VARIABLE = "variable";
 
         private const string RANKS = "ranks";
+        private const string UNIT_ACTUAL_NAME = "unit_actual_name";
     }
 }
