@@ -464,6 +464,12 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                     builder.Append($"{_directives[SyntaxKind.ReturnKeyword]} {_predefinedTypes[SyntaxKind.VoidKeyword]}");
                     builder.AppendLine();
                 }
+                // "ret i32 0" may be a solution 
+                else if ((method.ReturnType as PredefinedTypeSyntax).Keyword.Kind is SyntaxKind.IntKeyword)
+                {
+                    builder.Append($"{_directives[SyntaxKind.ReturnKeyword]} {_predefinedTypes[SyntaxKind.IntKeyword]} 0");
+                    builder.AppendLine();
+                }
 
                 builder.Append(_delimiters[body.CloseBraceToken.Kind]);
                 builder.AppendLine();
