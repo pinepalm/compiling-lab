@@ -1701,7 +1701,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
 
                 int rank = ranks[index];
 
-                return $"[{rank} x {GenerateParameterArrayType(ranks, scope, baseType, index + 1)}]";
+                return $"[{rank} x {GenerateParameterArrayTypeCore(ranks, scope, baseType, index + 1)}]";
             }
 
             string GenerateType(TypeSyntax type, MemberScope scope)
