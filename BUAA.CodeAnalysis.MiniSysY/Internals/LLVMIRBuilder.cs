@@ -1514,12 +1514,18 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                             builder.Append($"r{middleReg + 2}:");
                             builder.AppendLine();
 
-                            RealizeExpressionExcludeAssignment(binaryExpression.Right, scope, mustConst, (int)middleReg + 5, out int? beforeEndReg, out _);
+                            RealizeExpressionExcludeAssignment(binaryExpression.Right, scope, mustConst, (int)middleReg + 6, out int? beforeEndReg, out _);
 
                             if (beforeEndReg is null)
                             {
                                 throw new SemanticException();
                             }
+
+                            builder.Append($"br label %r{middleReg + 5}");
+                            builder.AppendLine();
+
+                            builder.Append($"r{middleReg + 5}:");
+                            builder.AppendLine();
 
                             builder.Append($"br label %r{middleReg + 4}");
                             builder.AppendLine();
@@ -1533,7 +1539,7 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                             builder.Append($"r{middleReg + 4}:");
                             builder.AppendLine();
 
-                            builder.Append($"%r{beforeEndReg + 1} = phi {_predefinedTypes[SyntaxKind.IntKeyword]} [%r{beforeEndReg}, %r{middleReg + 2}], [{(expression.Kind is SyntaxKind.LogicalOrExpression ? 1 : 0)}, %r{middleReg + 3}]");
+                            builder.Append($"%r{beforeEndReg + 1} = phi {_predefinedTypes[SyntaxKind.IntKeyword]} [%r{beforeEndReg}, %r{middleReg + 5}], [{(expression.Kind is SyntaxKind.LogicalOrExpression ? 1 : 0)}, %r{middleReg + 3}]");
                             builder.AppendLine();
 
                             builder.Append($"%r{beforeEndReg + 2} = {_directives[SyntaxKind.NotEqualsExpression]} {_predefinedTypes[SyntaxKind.IntKeyword]} %r{beforeEndReg + 1}, 0");
