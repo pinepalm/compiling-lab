@@ -1420,8 +1420,8 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
                     case SyntaxKind.MultiplyExpression:
                     case SyntaxKind.DivideExpression:
                     case SyntaxKind.ModuloExpression:
-                    case SyntaxKind.LogicalOrExpression:
-                    case SyntaxKind.LogicalAndExpression:
+                    // case SyntaxKind.LogicalOrExpression:
+                    // case SyntaxKind.LogicalAndExpression:
                     case SyntaxKind.EqualsExpression:
                     case SyntaxKind.NotEqualsExpression:
                     case SyntaxKind.LessThanExpression:
@@ -1491,6 +1491,58 @@ namespace BUAA.CodeAnalysis.MiniSysY.Internals
 
                                 endReg = lastReg = (int)beforeEndReg + 2;
                             }
+                        }
+
+                        break;
+                    case SyntaxKind.LogicalOrExpression:
+                    case SyntaxKind.LogicalAndExpression:
+                        {
+                            var binaryExpression = expression as BinaryExpressionSyntax;
+
+                            RealizeExpressionExcludeAssignment(binaryExpression.Left, scope, mustConst, startReg, out int? middleReg, out _);
+
+                            if (middleReg is null)
+                            {
+                                throw new SemanticException();
+                            }
+
+                            builder.Append($"%r{middleReg + 1} = {_directives[expression.Kind is SyntaxKind.LogicalOrExpression ? SyntaxKind.EqualsExpression : SyntaxKind.NotEqualsExpression]} {_predefinedTypes[SyntaxKind.IntKeyword]} %r{middleReg}, 0");
+                            builder.AppendLine();
+
+                            builder.Append($"br i1 %r{middleReg + 1}, label %r{middleReg + 2}, label %r{middleReg + 3}");
+                            builder.AppendLine();
+                            builder.Append($"r{middleReg + 2}:");
+                            builder.AppendLine();
+
+                            RealizeExpressionExcludeAssignment(binaryExpression.Right, scope, mustConst, (int)middleReg + 5, out int? beforeEndReg, out _);
+
+                            if (beforeEndReg is null)
+                            {
+                                throw new SemanticException();
+                            }
+
+                            builder.Append($"br label %r{middleReg + 4}");
+                            builder.AppendLine();
+
+                            builder.Append($"r{middleReg + 3}:");
+                            builder.AppendLine();
+
+                            builder.Append($"br label %r{middleReg + 4}");
+                            builder.AppendLine();
+
+                            builder.Append($"r{middleReg + 4}:");
+                            builder.AppendLine();
+
+                            builder.Append($"%r{beforeEndReg + 1} = phi {_predefinedTypes[SyntaxKind.IntKeyword]} [%r{beforeEndReg}, %r{middleReg + 2}], [{(expression.Kind is SyntaxKind.LogicalOrExpression ? 1 : 0)}, %r{middleReg + 3}]");
+                            builder.AppendLine();
+
+                            builder.Append($"%r{beforeEndReg + 2} = {_directives[SyntaxKind.NotEqualsExpression]} {_predefinedTypes[SyntaxKind.IntKeyword]} %r{beforeEndReg + 1}, 0");
+                            builder.AppendLine();
+
+                            builder.Append($"%r{beforeEndReg + 3} = zext i1 %r{beforeEndReg + 2} to {_predefinedTypes[SyntaxKind.IntKeyword]}");
+                            builder.AppendLine();
+
+                            endReg = lastReg = (int)beforeEndReg + 3;
                         }
 
                         break;

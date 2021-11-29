@@ -10,18 +10,16 @@ namespace BUAA.CodeAnalysis.MiniSysY
 
 #if DEBUG
         private const string TestMiniSysYCodeText =
-@"int func1() {
-    return 555;
-}
+@"int global_variable = 0;  // 全局变量
 
-int func2() {
-    return 111;
+int add() {
+    global_variable = global_variable + 1;
+    return 1;
 }
 
 int main() {
-    int a = func1();
-    putint(a - func2());
-    return 0;
+    if (1 == 1 || 1 == add()) {} // 我们并不想 add() 函数被调用
+    return global_variable;
 }";
 #endif
 
